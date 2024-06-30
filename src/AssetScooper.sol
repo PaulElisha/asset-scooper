@@ -139,12 +139,12 @@ contract AssetScooper is ReentrancyGuard {
             amountIn
         );
 
-        (address token0, ) = UniswapV2Library.sortTokens(tokenA, tokenB);
+        (address token0, ) = UniswapV2Library.sortTokens(tokenIn, tokenOut);
         (uint amount0Out, uint amount1Out) = tokenIn == token0
             ? (uint(0), amountOut)
             : (amountOut, uint(0));
 
-        address to = _to == address(0)
+        address to = tokenA == address(0) && tokenB == address(0)
             ? UniswapV2Library.pairFor(
                 factory,
                 weth,
