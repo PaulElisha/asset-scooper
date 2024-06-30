@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-// Import necessary contracts from Uniswap
-import "solady/ReentrancyGuard.sol";
-
 interface IAssetScooper {
     event TokenSwapped(
         address indexed tokenA,
