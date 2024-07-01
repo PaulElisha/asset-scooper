@@ -13,15 +13,6 @@ interface IAssetScooper {
 
     function version() external pure returns (string memory);
 
-    function _checkIfERC20Token(
-        address tokenAddress
-    ) external view returns (bool);
-
-    function _checkIfPairExists(
-        address _factory,
-        address tokenAddress
-    ) external pure returns (bool);
-
     function _getAmountIn(
         address token,
         uint256 tokenBalance
@@ -37,5 +28,8 @@ interface IAssetScooper {
         uint256 minAmountOut
     ) external;
 
-    function _swap(address pairAddress, uint256 minAmountOut) external;
+    function _swap(
+        address pairAddress,
+        uint256 minAmountOut
+    ) external returns (uint256);
 }

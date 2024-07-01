@@ -6,7 +6,6 @@ import "./Interfaces/IUniswapV2Pair.sol";
 import "./Lib/UniswapV2Library.sol";
 import "./Lib/TransferHelper.sol";
 import "solady/ReentrancyGuard.sol";
-import "./Interfaces/IWETH.sol";
 
 contract AssetScooper is ReentrancyGuard {
     address private immutable i_owner;
