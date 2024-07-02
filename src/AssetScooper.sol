@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 // Import necessary contracts from Uniswap
 import "./Interfaces/IUniswapV2Pair.sol";
@@ -83,7 +83,8 @@ contract AssetScooper is ReentrancyGuard {
         address[] calldata tokenAddress,
         uint256[] calldata minAmountOut
     ) public nonReentrant {
-        if (tokenAddress.length == 0) revert AssetScooper__ZeroLengthArray();
+        if (tokenAddress.length <= 0 && minAmountOut.length <= 0)
+            revert AssetScooper__ZeroLengthArray();
         if (tokenAddress.length != minAmountOut.length)
             revert AssetScooper__MisMatchLength();
 
@@ -113,7 +114,7 @@ contract AssetScooper is ReentrancyGuard {
         address tokenOut = tokenA == weth ? tokenA : tokenB;
 
         uint256 tokenBalance = _getTokenBalance(tokenIn, msg.sender);
-        if (tokenBalance == 0) revert AssetScooper__InsufficientBalance();
+        if (tokenBalance <= 0) revert AssetScooper__InsufficientBalance();
 
         uint256 amountIn = _getAmountIn(tokenIn, tokenBalance);
         (uint reserveA, uint reserveB) = UniswapV2Library.getReserves(
