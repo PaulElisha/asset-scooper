@@ -79,18 +79,6 @@ contract AssetScooper is ReentrancyGuard {
         }
     }
 
-    // function _batchApprove(
-    //     address[] calldata tokenAddresses,
-    //     address spender,
-    //     uint256[] calldata amounts
-    // ) private {
-    //     if (tokenAddresses.length != amounts.length)
-    //         revert AssetScooper__MisMatchLength();
-    //     for (uint256 i = 0; i < tokenAddresses.length; i++) {
-    //         TransferHelper.safeApprove(tokenAddresses[i], spender, amounts[i]);
-    //     }
-    // }
-
     function sweepTokens(
         address[] calldata tokenAddress,
         uint256[] calldata minAmountOut
@@ -143,8 +131,6 @@ contract AssetScooper is ReentrancyGuard {
 
         if (amountOut < minimumOutputAmount)
             revert AssetScooper__InsufficientOutputAmount();
-
-        // TransferHelper.safeApprove(tokenIn, pairAddress, amountIn);
 
         TransferHelper.safeTransferFrom(
             tokenIn,
