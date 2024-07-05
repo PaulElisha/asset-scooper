@@ -26,8 +26,6 @@ contract AssetScooper is ReentrancyGuard {
 
     error AssetScooper__ZeroLengthArray();
     error AssetScooper__InsufficientOutputAmount();
-    error AssetScooper__UnsuccessfulBalanceCall();
-    error AssetScooper__UnsuccessfulDecimalCall();
     error AssetScooper__InsufficientBalance();
     error AssetScooper__MisMatchLength();
 
@@ -83,8 +81,6 @@ contract AssetScooper is ReentrancyGuard {
         address[] calldata tokenAddress,
         uint256[] calldata minAmountOut
     ) public nonReentrant {
-        if (tokenAddress.length <= 0 && minAmountOut.length <= 0)
-            revert AssetScooper__ZeroLengthArray();
         if (tokenAddress.length != minAmountOut.length)
             revert AssetScooper__MisMatchLength();
 
@@ -108,10 +104,8 @@ contract AssetScooper is ReentrancyGuard {
     ) private returns (uint256 amountOut) {
         IUniswapV2Pair pair = IUniswapV2Pair(pairAddress);
 
-        address tokenA = pair.token0();
-        address tokenB = pair.token1();
-        address tokenIn = tokenA == weth ? tokenB : tokenA;
-        address tokenOut = tokenA == weth ? tokenA : tokenB;
+        address tokenIn = pair.token0() == weth ? pair.token1() : pair.token0();
+        address tokenOut = weth;
 
         uint256 tokenBalance = _getTokenBalance(tokenIn, msg.sender);
         if (tokenBalance <= 0) revert AssetScooper__InsufficientBalance();
@@ -119,15 +113,11 @@ contract AssetScooper is ReentrancyGuard {
         uint256 amountIn = _getAmountIn(tokenIn, tokenBalance);
         (uint reserveA, uint reserveB) = UniswapV2Library.getReserves(
             factory,
-            tokenA,
-            tokenB
+            tokenIn,
+            tokenOut
         );
 
-        amountOut = UniswapV2Library.getAmountOut(
-            amountIn,
-            tokenIn == tokenA ? reserveA : reserveB,
-            tokenOut == tokenB ? reserveB : reserveA
-        );
+        amountOut = UniswapV2Library.getAmountOut(amountIn, reserveA, reserveB);
 
         if (amountOut < minimumOutputAmount)
             revert AssetScooper__InsufficientOutputAmount();
@@ -139,17 +129,12 @@ contract AssetScooper is ReentrancyGuard {
             amountIn
         );
 
-        (address token0, ) = UniswapV2Library.sortTokens(tokenIn, tokenOut);
-        (uint amount0Out, uint amount1Out) = tokenIn == token0
+        (uint amount0Out, uint amount1Out) = tokenIn == tokenOut
             ? (uint(0), amountOut)
             : (amountOut, uint(0));
 
-        address to = tokenA == address(0) && tokenB == address(0)
-            ? UniswapV2Library.pairFor(
-                factory,
-                weth,
-                tokenIn == weth ? tokenOut : tokenA
-            )
+        address to = tokenIn == address(0) && tokenOut == address(0)
+            ? pairAddress
             : _to;
 
         pair.swap(amount0Out, amount1Out, to, new bytes(0));
