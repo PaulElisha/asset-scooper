@@ -10,11 +10,11 @@ import "solady/ReentrancyGuard.sol";
 contract AssetScooper is ReentrancyGuard {
     address private immutable i_owner;
 
-    string private constant i_version = "1.0.0";
+    string  private constant  i_version = "1.0.0";
 
-    address private constant weth = 0x4200000000000000000000000000000000000006;
+    address private constant  weth = 0x4200000000000000000000000000000000000006;
 
-    address private constant factory =
+    address private constant  factory =
         0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6;
 
     event TokenSwapped(
@@ -81,8 +81,9 @@ contract AssetScooper is ReentrancyGuard {
         address[] calldata tokenAddress,
         uint256[] calldata minAmountOut
     ) public nonReentrant {
-        if (tokenAddress.length != minAmountOut.length)
+        if (tokenAddress.length != minAmountOut.length) {
             revert AssetScooper__MisMatchLength();
+        }
 
         uint256 totalEth;
 
@@ -105,22 +106,29 @@ contract AssetScooper is ReentrancyGuard {
         IUniswapV2Pair pair = IUniswapV2Pair(pairAddress);
 
         address tokenIn = pair.token0() == weth ? pair.token1() : pair.token0();
-        address tokenOut = weth;
+        address tokenOut = pair.token0() == weth
+            ? pair.token0()
+            : pair.token1();
 
         uint256 tokenBalance = _getTokenBalance(tokenIn, msg.sender);
         if (tokenBalance <= 0) revert AssetScooper__InsufficientBalance();
 
         uint256 amountIn = _getAmountIn(tokenIn, tokenBalance);
-        (uint reserveA, uint reserveB) = UniswapV2Library.getReserves(
+        (uint256 reserveA, uint256 reserveB) = UniswapV2Library.getReserves(
             factory,
             tokenIn,
             tokenOut
         );
 
-        amountOut = UniswapV2Library.getAmountOut(amountIn, reserveA, reserveB);
+        amountOut = UniswapV2Library.getAmountOut(
+            amountIn,
+            tokenOut == pair.token0() ? reserveA : reserveB,
+            tokenIn == pair.token0() ? reserveB : reserveA
+        );
 
-        if (amountOut < minimumOutputAmount)
+        if (amountOut < minimumOutputAmount) {
             revert AssetScooper__InsufficientOutputAmount();
+        }
 
         TransferHelper.safeTransferFrom(
             tokenIn,
@@ -131,9 +139,9 @@ contract AssetScooper is ReentrancyGuard {
 
         (address token0, ) = UniswapV2Library.sortTokens(tokenIn, tokenOut);
 
-        (uint amount0Out, uint amount1Out) = tokenIn == token0
-            ? (uint(0), amountOut)
-            : (amountOut, uint(0));
+        (uint256 amount0Out, uint256 amount1Out) = tokenIn == token0
+            ? (uint256(0), amountOut)
+            : (amountOut, uint256(0));
 
         address to = tokenIn == address(0) && tokenOut == address(0)
             ? pairAddress
