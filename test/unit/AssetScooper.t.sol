@@ -62,6 +62,8 @@ contract AssetScooperTest is Test, Constants, TestHelper {
             "User A should have 100 ether after minting"
         );
 
+        mockERC20.approve(address(permit2), type(uint256).max);
+
         vm.stopPrank();
 
         // aero = IERC20(AERO);
@@ -117,20 +119,21 @@ contract AssetScooperTest is Test, Constants, TestHelper {
 
         // digest = constructSig(permit2TransferDetails.permit);
 
+      
+        sig = getPermitTransferSignature(
+            permit2_,
+            privateKey,
+            address(assetScooper),
+            domain_separator
+        );
+
         ISignatureTransfer.SignatureTransferDetails
             memory transferDetails_ = getTransferDetails(
                 address(assetScooper),
                 mockERC20.balanceOf(userA)
             );
 
-        sig = getPermitTransferSignature(
-            permit2_,
-            privateKey,
-            domain_separator
-        );
-
         vm.startPrank(userA);
-
         assetScooper.sweepAsset(swapParam, permit2_, transferDetails_, sig);
 
         vm.stopPrank();

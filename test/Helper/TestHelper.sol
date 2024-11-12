@@ -11,13 +11,11 @@ contract TestHelper {
     Vm private constant vm =
         Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    bytes32 public constant _TOKEN_PERMISSIONS_TYPEHASH =
-        keccak256("TokenPermissions(address token,uint256 amount)");
+    bytes32 public constant _TOKEN_PERMISSIONS_TYPEHASH = keccak256("TokenPermissions(address token,uint256 amount)");
 
-    bytes32 public constant _PERMIT_TRANSFER_FROM_TYPEHASH =
-        keccak256(
-            "PermitTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline)TokenPermissions(address token,uint256 amount)"
-        );
+    bytes32 public constant _PERMIT_TRANSFER_FROM_TYPEHASH = keccak256(
+        "PermitTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline)TokenPermissions(address token,uint256 amount)"
+    );
 
     function createSwapParam(
         IERC20 asset
@@ -144,6 +142,7 @@ contract TestHelper {
     function getPermitTransferSignature(
         ISignatureTransfer.PermitTransferFrom memory permit,
         uint256 privateKey,
+        address spender,
         bytes32 domainSeparator
     ) internal view returns (bytes memory sig) {
         bytes32 tokenPermissions = keccak256(
@@ -157,7 +156,7 @@ contract TestHelper {
                     abi.encode(
                         _PERMIT_TRANSFER_FROM_TYPEHASH,
                         tokenPermissions,
-                        address(this),
+                        spender,
                         permit.nonce,
                         permit.deadline
                     )
