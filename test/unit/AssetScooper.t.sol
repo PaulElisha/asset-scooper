@@ -26,51 +26,49 @@ contract AssetScooperTest is Test, Constants, TestHelper {
     address userB;
 
     uint256 privateKey;
-    bytes32 digest;
     bytes32 domain_separator;
     bytes sig;
 
     uint256 internal mainnetFork;
 
     function setUp() public {
-        mockERC20 = new MockERC20();
+        // mockERC20 = new MockERC20();
 
-        permit2 = new Permit2();
-        assetScooper = new AssetScooper(
-            IWETH(weth),
-            IUniswapV2Router02(router),
-            permit2
-        );
-        // deployAssetScooper = new DeployAssetScooper();
-        // (assetScooper, _permit2) = deployAssetScooper.run();
-        domain_separator = permit2.DOMAIN_SEPARATOR();
+        // permit2 = new Permit2();
+        // assetScooper = new AssetScooper(
+        //     IWETH(weth),
+        //     IUniswapV2Router02(router),
+        //     permit2
+        // );
 
-        privateKey = vm.envUint("private_key");
+        deployAssetScooper = new DeployAssetScooper();
+        (assetScooper, permit2) = deployAssetScooper.run();
+
+        privateKey = vm.envUint("PRIVATE_KEY");
         userA = vm.addr(privateKey);
 
-        // userA = makeAddr("userA");
         console2.log(userA);
 
-        vm.startPrank(userA);
+        // vm.startPrank(userA);
 
-        mockERC20.mint(userA, 100 ether);
+        // mockERC20.mint(userA, 100 ether);
 
-        uint256 balance = mockERC20.balanceOf(userA);
-        assertEq(
-            balance,
-            100 ether,
-            "User A should have 100 ether after minting"
-        );
+        // uint256 balance = mockERC20.balanceOf(userA);
+        // assertEq(
+        //     balance,
+        //     100 ether,
+        //     "User A should have 100 ether after minting"
+        // );
 
-        mockERC20.approve(address(permit2), type(uint256).max);
+        // mockERC20.approve(address(permit2), type(uint256).max);
 
-        vm.stopPrank();
+        // vm.stopPrank();
 
-        // aero = IERC20(AERO);
-        // wgc = IERC20(WGC);
+        aero = IERC20(AERO);
+        wgc = IERC20(WGC);
 
-        // mainnetFork = vm.createFork(fork_url);
-        // vm.selectFork(mainnetFork);
+        mainnetFork = vm.createFork(fork_url);
+        vm.selectFork(mainnetFork);
     }
 
     // function testMint() public {
@@ -102,24 +100,20 @@ contract AssetScooperTest is Test, Constants, TestHelper {
 
     function testSweep() public {
         uint256 nonce = 0;
-        swapParam = createSwapParam(mockERC20);
+        domain_separator = permit2.DOMAIN_SEPARATOR();
+        swapParam = createSwapParam(aero);
 
-        // permit2TransferDetails = createSignatureTransferData(
-        //     mockERC20,
-        //     assetScooper,
-        //     userA
-        // );
+        vm.startPrank(userA);
+        aero.approve(address(permit2), aero.balanceOf(userA));
+        vm.stopPrank();
 
         ISignatureTransfer.PermitTransferFrom
             memory permit2_ = defaultERC20PermitTransfer(
-                address(mockERC20),
+                address(aero),
                 nonce,
-                mockERC20.balanceOf(userA)
+                aero.balanceOf(userA)
             );
 
-        // digest = constructSig(permit2TransferDetails.permit);
-
-      
         sig = getPermitTransferSignature(
             permit2_,
             privateKey,
@@ -130,7 +124,7 @@ contract AssetScooperTest is Test, Constants, TestHelper {
         ISignatureTransfer.SignatureTransferDetails
             memory transferDetails_ = getTransferDetails(
                 address(assetScooper),
-                mockERC20.balanceOf(userA)
+                aero.balanceOf(userA)
             );
 
         vm.startPrank(userA);

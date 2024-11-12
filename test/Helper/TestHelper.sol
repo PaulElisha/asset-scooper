@@ -11,101 +11,19 @@ contract TestHelper {
     Vm private constant vm =
         Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    bytes32 public constant _TOKEN_PERMISSIONS_TYPEHASH = keccak256("TokenPermissions(address token,uint256 amount)");
+    bytes32 public constant _TOKEN_PERMISSIONS_TYPEHASH =
+        keccak256("TokenPermissions(address token,uint256 amount)");
 
-    bytes32 public constant _PERMIT_TRANSFER_FROM_TYPEHASH = keccak256(
-        "PermitTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline)TokenPermissions(address token,uint256 amount)"
-    );
+    bytes32 public constant _PERMIT_TRANSFER_FROM_TYPEHASH =
+        keccak256(
+            "PermitTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline)TokenPermissions(address token,uint256 amount)"
+        );
 
     function createSwapParam(
         IERC20 asset
     ) public pure returns (IAssetScooper.SwapParam memory) {
         return
             IAssetScooper.SwapParam({asset: address(asset), outputAmount: 0});
-    }
-
-    // function createSignatureTransferData(
-    //     IERC20 asset,
-    //     AssetScooper assetScooper,
-    //     address user
-    // ) public view returns (IAssetScooper.Permit2TransferDetails memory) {
-    //     uint256 bal = asset.balanceOf(user);
-
-    //     ISignatureTransfer.TokenPermissions
-    //         memory permittedTokens = ISignatureTransfer.TokenPermissions({
-    //             token: address(asset),
-    //             amount: bal
-    //         });
-
-    //     ISignatureTransfer.PermitTransferFrom memory permit = ISignatureTransfer
-    //         .PermitTransferFrom({
-    //             permitted: permittedTokens,
-    //             nonce: 0,
-    //             deadline: block.timestamp + 1 days
-    //         });
-
-    //     // permit.permitted[0] = permittedTokens;
-
-    //     ISignatureTransfer.SignatureTransferDetails
-    //         memory transferDetail = ISignatureTransfer
-    //             .SignatureTransferDetails({
-    //                 to: address(assetScooper),
-    //                 requestedAmount: bal
-    //             });
-
-    //     return
-    //         IAssetScooper.Permit2TransferDetails({
-    //             permit: permit,
-    //             transferDetails: transferDetail
-    //         });
-
-    //     // ISignatureTransfer.SignatureTransferDetails[]
-    //     //     memory transferDetails = new ISignatureTransfer.SignatureTransferDetails[](
-    //     //         1
-    //     //     );
-
-    //     // transferDetails[0] = transferDetail;
-
-    //     // AssetScooper.Permit2SignatureTransferData
-    //     //     memory signatureTransferData = AssetScooper
-    //     //         .Permit2SignatureTransferData({
-    //     //             permit: permit,
-    //     //             transferDetails: transferDetail
-    //     //         });
-    // }
-
-    // function constructSig(
-    //     ISignatureTransfer.PermitTransferFrom memory permit
-    // ) public view returns (bytes32 digest) {
-    //     bytes32 mhash = hashPermit(permit);
-
-    //     // digest = _hashTypedDataV4(mhash);
-
-    //     // console.log("Signer", ecrecover(digest, v, r, s));
-    //     // assertEq(signer, ecrecover(digest, v, r, s));
-    //     // console.log("Test Helper: Sig", sig);
-    // }
-
-    function _hashTokenPermissions(
-        ISignatureTransfer.TokenPermissions memory permitted
-    ) private pure returns (bytes32) {
-        return keccak256(abi.encode(_TOKEN_PERMISSIONS_TYPEHASH, permitted));
-    }
-
-    function hashPermit(
-        ISignatureTransfer.PermitTransferFrom memory permit
-    ) internal view returns (bytes32) {
-        bytes32 tokenPermissionsHash = _hashTokenPermissions(permit.permitted);
-        return
-            keccak256(
-                abi.encode(
-                    _PERMIT_TRANSFER_FROM_TYPEHASH,
-                    tokenPermissionsHash,
-                    msg.sender,
-                    permit.nonce,
-                    permit.deadline
-                )
-            );
     }
 
     function defaultERC20PermitTransfer(
@@ -144,7 +62,7 @@ contract TestHelper {
         uint256 privateKey,
         address spender,
         bytes32 domainSeparator
-    ) internal view returns (bytes memory sig) {
+    ) internal pure returns (bytes memory sig) {
         bytes32 tokenPermissions = keccak256(
             abi.encode(_TOKEN_PERMISSIONS_TYPEHASH, permit.permitted)
         );

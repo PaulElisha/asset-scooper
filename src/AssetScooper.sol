@@ -54,6 +54,7 @@ contract AssetScooper is IAssetScooper, ReentrancyGuard {
         }
 
         uint256 balanceBefore = _getTokenBalance(param.asset, address(this));
+        console.log("Scooper Balance Before", balanceBefore);
 
         permit2.permitTransferFrom(permit, transferDetails, msg.sender, sig);
 
@@ -65,7 +66,7 @@ contract AssetScooper is IAssetScooper, ReentrancyGuard {
         );
 
         uint256 balanceAfter = _getTokenBalance(param.asset, address(this));
-        console.log("Scooper Balance ", balanceAfter);
+        console.log("Scooper Balance After", balanceAfter);
 
         // asset.approve(address(uniswapRouter), tokenBalance);
 
