@@ -6,7 +6,7 @@ abstract contract Constants {
     address public constant factory =
         0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6;
     address public constant router = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;
-    address public constant permit2 =
+    address public constant permit2Address =
         0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
     address public constant AERO = 0x3C281A39944a2319aA653D81Cfd93Ca10983D234;

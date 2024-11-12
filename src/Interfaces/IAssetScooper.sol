@@ -25,18 +25,14 @@ interface IAssetScooper {
         uint256 outputAmount;
     }
 
-    struct Permit2TransferDetails {
-        ISignatureTransfer.PermitTransferFrom permit;
-        ISignatureTransfer.SignatureTransferDetails transferDetails;
-    }
-
     function owner() external view returns (address);
 
     function version() external view returns (string memory);
 
     function sweepAsset(
         SwapParam memory param,
-        Permit2TransferDetails memory permit2TransferDetails,
+        ISignatureTransfer.PermitTransferFrom memory permit,
+        ISignatureTransfer.SignatureTransferDetails memory transferDetails,
         bytes memory sig
     ) external;
 }

@@ -4,9 +4,10 @@ pragma solidity ^0.8.0;
 import "./Interfaces/IAssetScooper.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "permit2/src/interfaces/IPermit2.sol";
+import "permit2/src/Permit2.sol";
 import "@uniswap/v2-periphery/interfaces/IUniswapV2Router02.sol";
 import "@uniswap/v2-periphery/interfaces/IWETH.sol";
+import "forge-std/console.sol";
 
 contract AssetScooper is IAssetScooper, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -16,42 +17,34 @@ contract AssetScooper is IAssetScooper, ReentrancyGuard {
 
     IWETH private immutable weth;
     IUniswapV2Router02 private immutable uniswapRouter;
-    IPermit2 private immutable signatureTransfer;
+    Permit2 public immutable permit2;
 
-    constructor(
-        IWETH _weth,
-        IUniswapV2Router02 _router,
-        IPermit2 _signatureTransfer
-    ) {
+    constructor(IWETH _weth, IUniswapV2Router02 _router, Permit2 _permit2) {
         weth = _weth;
         uniswapRouter = _router;
-        signatureTransfer = _signatureTransfer;
+        permit2 = _permit2;
         _owner = msg.sender;
     }
 
     function sweepAsset(
         IAssetScooper.SwapParam memory param,
-        Permit2TransferDetails memory permit2TransferDetails,
+        ISignatureTransfer.PermitTransferFrom memory permit,
+        ISignatureTransfer.SignatureTransferDetails memory transferDetails,
         bytes memory sig
     ) public {
-        if (param.asset != permit2TransferDetails.permit.permitted.token) {
+        if (param.asset != permit.permitted.token) {
             revert AssetScooper__InvalidAsset(param.asset);
         }
 
-        uint256 amountOut;
-        IERC20 asset;
-
-        asset = IERC20(param.asset);
-        uint256 minAmountOut = param.outputAmount;
-        uint256 tokenBalance = _getTokenBalance(address(asset), msg.sender);
+        // uint256 amountOut;
+        // uint256 minAmountOut = param.outputAmount;
+        uint256 tokenBalance = _getTokenBalance(param.asset, msg.sender);
 
         if (tokenBalance > 0) {
             if (
-                permit2TransferDetails.transferDetails.to != address(this) ||
-                permit2TransferDetails.transferDetails.requestedAmount !=
-                tokenBalance ||
-                permit2TransferDetails.permit.permitted.amount !=
-                permit2TransferDetails.transferDetails.requestedAmount
+                transferDetails.to != address(this) ||
+                transferDetails.requestedAmount != tokenBalance ||
+                permit.permitted.amount != transferDetails.requestedAmount
             ) {
                 revert AssetScooper__InvalidTransferDetails(
                     address(this),
@@ -60,43 +53,41 @@ contract AssetScooper is IAssetScooper, ReentrancyGuard {
             }
         }
 
-        uint256 balanceBefore = _getTokenBalance(address(asset), address(this));
+        uint256 balanceBefore = _getTokenBalance(param.asset, address(this));
 
-        signatureTransfer.permitTransferFrom(
-            permit2TransferDetails.permit,
-            permit2TransferDetails.transferDetails,
-            msg.sender,
-            sig
-        );
+        permit2.permitTransferFrom(permit, transferDetails, msg.sender, sig);
 
         _revertIfAmountOutNotExactAmount(
             tokenBalance,
             balanceBefore,
-            address(asset),
+            param.asset,
             address(this)
         );
 
-        asset.approve(address(uniswapRouter), tokenBalance);
+        uint256 balanceAfter = _getTokenBalance(param.asset, address(this));
+        console.log("Scooper Balance ", balanceAfter);
 
-        address[] memory path = new address[](2);
-        path[0] = address(asset);
-        path[1] = address(weth);
+        // asset.approve(address(uniswapRouter), tokenBalance);
 
-        uint256[] memory amounts = uniswapRouter.swapExactTokensForTokens(
-            tokenBalance,
-            minAmountOut,
-            path,
-            address(this),
-            block.timestamp + 100 // Allowing a small time window for the swap to complete
-        );
+        // address[] memory path = new address[](2);
+        // path[0] = param.asset;
+        // path[1] = address(weth);
 
-        amountOut += amounts[1];
+        // uint256[] memory amounts = uniswapRouter.swapExactTokensForTokens(
+        //     tokenBalance,
+        //     minAmountOut,
+        //     path,
+        //     address(this),
+        //     block.timestamp + 100 // Allowing a small time window for the swap to complete
+        // );
 
-        if (amountOut < minAmountOut) {
-            revert AssetScooper__NotEnoughOutputAmount(amountOut);
-        }
+        // amountOut += amounts[1];
 
-        emit AssetSwapped(msg.sender, address(asset), amountOut);
+        // if (amountOut < minAmountOut) {
+        //     revert AssetScooper__NotEnoughOutputAmount(amountOut);
+        // }
+
+        // emit AssetSwapped(msg.sender, address(asset), amountOut);
     }
 
     function _revertIfAmountOutNotExactAmount(
