@@ -101,11 +101,12 @@ contract AssetScooperTest is Test, Constants, TestHelper {
     function testSweep() public {
         uint256 nonce = 0;
         domain_separator = permit2.DOMAIN_SEPARATOR();
-        swapParam = createSwapParam(aero);
 
         vm.startPrank(userA);
         aero.approve(address(permit2), aero.balanceOf(userA));
         vm.stopPrank();
+
+        swapParam = createSwapParam(aero);
 
         ISignatureTransfer.PermitTransferFrom
             memory permit2_ = defaultERC20PermitTransfer(
@@ -129,7 +130,6 @@ contract AssetScooperTest is Test, Constants, TestHelper {
 
         vm.startPrank(userA);
         assetScooper.sweepAsset(swapParam, permit2_, transferDetails_, sig);
-
         vm.stopPrank();
     }
 }

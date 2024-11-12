@@ -36,7 +36,7 @@ contract AssetScooper is IAssetScooper, ReentrancyGuard {
             revert AssetScooper__InvalidAsset(param.asset);
         }
 
-        // uint256 amountOut;
+        uint256 amountOut;
         // uint256 minAmountOut = param.outputAmount;
         uint256 tokenBalance = _getTokenBalance(param.asset, msg.sender);
 
@@ -68,27 +68,29 @@ contract AssetScooper is IAssetScooper, ReentrancyGuard {
         uint256 balanceAfter = _getTokenBalance(param.asset, address(this));
         console.log("Scooper Balance After", balanceAfter);
 
-        // asset.approve(address(uniswapRouter), tokenBalance);
+        IERC20(param.asset).approve(address(uniswapRouter), tokenBalance);
+        console.log("Amount Out Before", amountOut);
 
-        // address[] memory path = new address[](2);
-        // path[0] = param.asset;
-        // path[1] = address(weth);
+        address[] memory path = new address[](2);
+        path[0] = param.asset;
+        path[1] = address(weth);
 
-        // uint256[] memory amounts = uniswapRouter.swapExactTokensForTokens(
-        //     tokenBalance,
-        //     minAmountOut,
-        //     path,
-        //     address(this),
-        //     block.timestamp + 100 // Allowing a small time window for the swap to complete
-        // );
+        uint256[] memory amounts = uniswapRouter.swapExactTokensForTokens(
+            tokenBalance,
+            param.outputAmount,
+            path,
+            address(this),
+            block.timestamp + 100 // Allowing a small time window for the swap to complete
+        );
 
-        // amountOut += amounts[1];
+        amountOut += amounts[1];
 
-        // if (amountOut < minAmountOut) {
-        //     revert AssetScooper__NotEnoughOutputAmount(amountOut);
-        // }
+        if (amountOut < param.outputAmount) {
+            revert AssetScooper__NotEnoughOutputAmount(amountOut);
+        }
 
-        // emit AssetSwapped(msg.sender, address(asset), amountOut);
+        emit AssetSwapped(msg.sender, address(param.asset), amountOut);
+        console.log("Amount Out After", amountOut);
     }
 
     function _revertIfAmountOutNotExactAmount(
