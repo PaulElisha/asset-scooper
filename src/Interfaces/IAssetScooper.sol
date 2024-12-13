@@ -4,25 +4,29 @@ pragma solidity ^0.8.0;
 import "permit2/src/interfaces/ISignatureTransfer.sol";
 
 interface IAssetScooper {
-    error AssetScooper__UnsuccessfulBalanceCall();
-    error AssetScooper__InvalidAsset(address asset);
-    error AssetScooper__InvalidTransferDetails(
-        address assetScooper,
-        uint256 userBal
-    );
-    error AssetScooper__InexactTransfer();
+    error UnsuccessfulBalanceCall();
+    error InexactTransfer();
+    error NotEnoughOutputAmount(uint256 amountOut);
+    error MismatchLength();
+    error NoLiquidity(address token0, address token1);
 
+    event AssetTransferred(
+        SwapParam indexed param,
+        address indexed receiver,
+        address indexed sender
+    );
     event AssetSwapped(
         address indexed sender,
-        address indexed asset,
+        SwapParam indexed param,
         uint256 indexed amountOut
     );
-
-    error AssetScooper__NotEnoughOutputAmount(uint256 amountOut);
+    event InsufficientLiquidity(address indexed token0, address indexed token1);
 
     struct SwapParam {
-        address asset;
-        uint256 outputAmount;
+        address[] assets;
+        uint256[] minOutputAmounts;
+        address tokenOut;
+        uint256 deadline;
     }
 
     function owner() external view returns (address);
@@ -31,8 +35,7 @@ interface IAssetScooper {
 
     function sweepAsset(
         SwapParam memory param,
-        ISignatureTransfer.PermitTransferFrom memory permit,
-        ISignatureTransfer.SignatureTransferDetails memory transferDetails,
-        bytes memory sig
+        ISignatureTransfer.PermitBatchTransferFrom memory permit,
+        bytes memory signature
     ) external;
 }

@@ -2,45 +2,36 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
+import "../mocks/MockERC20.sol";
 import "../../src/Constants.sol";
+import "permit2/src/Permit2.sol";
+import "../Helper/TestHelper.sol";
 import "../../src/AssetScooper.sol";
 import "../../script/DeployAssetScooper.s.sol";
 import "../../src/Interfaces/IAssetScooper.sol";
-import "permit2/src/Permit2.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
-import "../Helper/TestHelper.sol";
-import "permit2/src/interfaces/IPermit2.sol";
 import "permit2/src/interfaces/ISignatureTransfer.sol";
-import "../mocks/MockERC20.sol";
 
 contract AssetScooperTest is Test, Constants, TestHelper {
     DeployAssetScooper deployAssetScooper;
     AssetScooper assetScooper;
-    IAssetScooper.SwapParam swapParam;
+    Permit2 permit2;
     IERC20 aero;
     IERC20 wgc;
-    MockERC20 mockERC20;
-    Permit2 permit2;
+    IERC20 toby;
+    IERC20 bento;
+    IERC20 dai;
 
     address userA;
     address userB;
 
     uint256 privateKey;
     bytes32 domain_separator;
-    bytes sig;
+    bytes signature;
 
     uint256 internal mainnetFork;
 
     function setUp() public {
-        // mockERC20 = new MockERC20();
-
-        // permit2 = new Permit2();
-        // assetScooper = new AssetScooper(
-        //     IWETH(weth),
-        //     IUniswapV2Router02(router),
-        //     permit2
-        // );
-
         deployAssetScooper = new DeployAssetScooper();
         (assetScooper, permit2) = deployAssetScooper.run();
 
@@ -49,87 +40,166 @@ contract AssetScooperTest is Test, Constants, TestHelper {
 
         console2.log(userA);
 
-        // vm.startPrank(userA);
-
-        // mockERC20.mint(userA, 100 ether);
-
-        // uint256 balance = mockERC20.balanceOf(userA);
-        // assertEq(
-        //     balance,
-        //     100 ether,
-        //     "User A should have 100 ether after minting"
-        // );
-
-        // mockERC20.approve(address(permit2), type(uint256).max);
-
-        // vm.stopPrank();
-
         aero = IERC20(AERO);
         wgc = IERC20(WGC);
+        toby = IERC20(TOBY);
+        bento = IERC20(BENTO);
+        dai = IERC20(DAI);
 
         mainnetFork = vm.createFork(fork_url);
         vm.selectFork(mainnetFork);
     }
 
-    // function testMint() public {
-    //     userA = makeAddr("userA");
-    //     userB = makeAddr("userB");
-    //     console2.log(userA);
-
-    //     vm.startPrank(userA);
-
-    //     mockERC20.mint(userA, 100 ether);
-
-    //     uint256 balance = mockERC20.balanceOf(userA);
-    //     assertEq(
-    //         balance,
-    //         100 ether,
-    //         "User A should have 100 ether after minting"
-    //     );
-
-    //     vm.stopPrank();
-    // }
-
     function testOwner() public view {
-        assertEq(assetScooper.owner(), address(this));
+        assertEq(assetScooper.owner(), msg.sender);
     }
 
     function testVersion() public view {
         assertEq(assetScooper.version(), "1.0.0");
     }
 
-    function testSweep() public {
-        uint256 nonce = 0;
+    function testSweepAsset() public {
+        uint256 nonce = 20;
         domain_separator = permit2.DOMAIN_SEPARATOR();
 
+        uint256 aeroBalance = aero.balanceOf(userA);
+        uint256 daiBalance = dai.balanceOf(userA);
+        uint256 bentoBalance = bento.balanceOf(userA);
+        uint256 tobyBalance = toby.balanceOf(userA);
+
         vm.startPrank(userA);
-        aero.approve(address(permit2), aero.balanceOf(userA));
+        aero.approve(address(permit2), aeroBalance);
+        dai.approve(address(permit2), daiBalance);
+        bento.approve(address(permit2), bentoBalance);
+        toby.approve(address(permit2), tobyBalance);
         vm.stopPrank();
 
-        swapParam = createSwapParam(aero);
+        address[] memory assets = new address[](4);
+        address[] memory to = new address[](4);
+        uint256[] memory outputs = new uint256[](4);
+        uint256[] memory balances = new uint256[](4);
 
-        ISignatureTransfer.PermitTransferFrom
-            memory permit2_ = defaultERC20PermitTransfer(
-                address(aero),
-                nonce,
-                aero.balanceOf(userA)
+        assets[0] = address(aero);
+        assets[1] = address(dai);
+        assets[2] = address(bento);
+        assets[3] = address(toby);
+
+        to[0] = address(assetScooper);
+        to[1] = address(assetScooper);
+        to[2] = address(assetScooper);
+        to[3] = address(assetScooper);
+
+        outputs[0] = 0;
+        outputs[1] = 0;
+        outputs[2] = 0;
+        outputs[3] = 0;
+
+        balances[0] = aeroBalance;
+        balances[1] = daiBalance;
+        balances[2] = bentoBalance;
+        balances[3] = tobyBalance;
+
+        IAssetScooper.SwapParam memory swapParam = createSwapParam(
+            assets,
+            outputs,
+            block.timestamp
+        );
+
+        ISignatureTransfer.TokenPermissions[]
+            memory batchTokenPermissions = getBatchTokenPermissions(
+                assets,
+                balances
             );
 
-        sig = getPermitTransferSignature(
+        ISignatureTransfer.PermitBatchTransferFrom
+            memory permit2_ = defaultERC20PermitBatchTransfer(
+                batchTokenPermissions,
+                nonce,
+                block.timestamp
+            );
+
+        signature = getPermitTransferSignature(
             permit2_,
             privateKey,
             address(assetScooper),
             domain_separator
         );
 
-        ISignatureTransfer.SignatureTransferDetails
-            memory transferDetails_ = getTransferDetails(
-                address(assetScooper),
-                aero.balanceOf(userA)
-            );
+        vm.startPrank(userA);
+        assetScooper.sweepAsset(swapParam, permit2_, signature);
+        vm.stopPrank();
+    }
+
+    function testInvalidSignature_SweepAsset() public {
+        uint256 nonce = 20;
+        domain_separator = permit2.DOMAIN_SEPARATOR();
+
+        uint256 aeroBalance = aero.balanceOf(userA);
+        uint256 daiBalance = dai.balanceOf(userA);
+        uint256 bentoBalance = bento.balanceOf(userA);
+        uint256 tobyBalance = toby.balanceOf(userA);
 
         vm.startPrank(userA);
-        assetScooper.sweepAsset(swapParam, permit2_, transferDetails_, sig);
+        aero.approve(address(permit2), aeroBalance);
+        dai.approve(address(permit2), daiBalance);
+        bento.approve(address(permit2), bentoBalance);
+        toby.approve(address(permit2), tobyBalance);
+        vm.stopPrank();
+
+        address[] memory assets = new address[](4);
+        address[] memory to = new address[](4);
+        uint256[] memory outputs = new uint256[](4);
+        uint256[] memory balances = new uint256[](4);
+
+        assets[0] = address(aero);
+        assets[1] = address(dai);
+        assets[2] = address(bento);
+        assets[3] = address(toby);
+
+        to[0] = address(assetScooper);
+        to[1] = address(assetScooper);
+        to[2] = address(assetScooper);
+        to[3] = address(assetScooper);
+
+        outputs[0] = 0;
+        outputs[1] = 0;
+        outputs[2] = 0;
+        outputs[3] = 0;
+
+        balances[0] = aeroBalance;
+        balances[1] = daiBalance;
+        balances[2] = bentoBalance;
+        balances[3] = tobyBalance;
+
+        IAssetScooper.SwapParam memory swapParam = createSwapParam(
+            assets,
+            outputs,
+            block.timestamp
+        );
+
+        ISignatureTransfer.TokenPermissions[]
+            memory batchTokenPermissions = getBatchTokenPermissions(
+                assets,
+                balances
+            );
+
+        ISignatureTransfer.PermitBatchTransferFrom
+            memory permit2_ = defaultERC20PermitBatchTransfer(
+                batchTokenPermissions,
+                nonce,
+                block.timestamp
+            );
+
+        signature = getPermitTransferSignature(
+            permit2_,
+            privateKey,
+            address(this),
+            domain_separator
+        );
+
+        vm.startPrank(userA);
+        vm.expectRevert();
+        assetScooper.sweepAsset(swapParam, permit2_, signature);
         vm.stopPrank();
     }
 }

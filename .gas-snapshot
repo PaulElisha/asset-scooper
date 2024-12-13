@@ -1,0 +1,4 @@
+AssetScooperTest:testInvalidSignature_SweepAsset() (gas: 638895)
+AssetScooperTest:testOwner() (gas: 11111)
+AssetScooperTest:testSweepAsset() (gas: 871831)
+AssetScooperTest:testVersion() (gas: 12313)

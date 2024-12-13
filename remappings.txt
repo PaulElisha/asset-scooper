@@ -1,2 +1,3 @@
 "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
 "permit2/src/=lib/permit2/src/",
+"universal-router/contracts/=lib/universal-router/contracts",

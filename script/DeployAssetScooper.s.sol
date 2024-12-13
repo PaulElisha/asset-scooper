@@ -7,22 +7,25 @@ import "../src/AssetScooper.sol";
 import "permit2/src/Permit2.sol";
 import "@uniswap/v2-periphery/interfaces/IUniswapV2Router02.sol";
 import "@uniswap/v2-periphery/interfaces/IWETH.sol";
+import "@uniswap/v2-core/interfaces/IUniswapV2Factory.sol";
 
 contract DeployAssetScooper is Script, Constants {
     AssetScooper assetScooper;
+    Permit2 permit;
 
     function run() public returns (AssetScooper, Permit2) {
         return deployAssetScooper();
     }
 
     function deployAssetScooper() public returns (AssetScooper, Permit2) {
-        Permit2 permit = Permit2(permit2Address);
+        permit = Permit2(permit2Address);
 
         vm.startBroadcast();
         assetScooper = new AssetScooper(
             IWETH(weth),
             IUniswapV2Router02(router),
-            permit
+            permit,
+            IUniswapV2Factory(factory)
         );
         vm.stopBroadcast();
 
