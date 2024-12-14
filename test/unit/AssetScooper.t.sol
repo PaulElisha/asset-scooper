@@ -33,7 +33,9 @@ contract AssetScooperTest is Test, Constants, TestHelper {
 
     function setUp() public {
         deployAssetScooper = new DeployAssetScooper();
-        (assetScooper, permit2) = deployAssetScooper.run();
+        (assetScooper) = deployAssetScooper.run();
+
+        permit2 = assetScooper.permit2();
 
         privateKey = vm.envUint("PRIVATE_KEY");
         userA = vm.addr(privateKey);

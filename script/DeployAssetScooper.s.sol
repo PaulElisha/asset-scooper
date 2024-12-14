@@ -13,22 +13,15 @@ contract DeployAssetScooper is Script, Constants {
     AssetScooper assetScooper;
     Permit2 permit;
 
-    function run() public returns (AssetScooper, Permit2) {
+    function run() public returns (AssetScooper) {
         return deployAssetScooper();
     }
 
-    function deployAssetScooper() public returns (AssetScooper, Permit2) {
-        permit = Permit2(permit2Address);
-
+    function deployAssetScooper() public returns (AssetScooper) {
         vm.startBroadcast();
-        assetScooper = new AssetScooper(
-            IWETH(weth),
-            IUniswapV2Router02(router),
-            permit,
-            IUniswapV2Factory(factory)
-        );
+        assetScooper = new AssetScooper(weth, router, permit2Address, factory);
         vm.stopBroadcast();
 
-        return (assetScooper, permit);
+        return (assetScooper);
     }
 }

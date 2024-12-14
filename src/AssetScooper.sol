@@ -34,15 +34,15 @@ contract AssetScooper is
     Permit2 public immutable permit2;
 
     constructor(
-        IWETH _weth,
-        IUniswapV2Router02 _router,
-        Permit2 _permit2,
-        IUniswapV2Factory _uniswapFactory
+        address _weth,
+        address _router,
+        address _permit2,
+        address _uniswapFactory
     ) Ownable(_msgSender()) {
-        weth = _weth;
-        uniswapRouter = _router;
-        uniswapFactory = _uniswapFactory;
-        permit2 = _permit2;
+        weth = IWETH(_weth);
+        uniswapRouter = IUniswapV2Router02(_router);
+        uniswapFactory = IUniswapV2Factory(_uniswapFactory);
+        permit2 = Permit2(_permit2);
         _owner = _msgSender();
     }
 
