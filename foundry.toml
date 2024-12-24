@@ -4,9 +4,12 @@ out = "out"
 libs = ["lib"]
 --via-ir = true
 remappings = [
-    "@uniswap/v2-periphery/=lib/v2-periphery/contracts/",
-    "@uniswap/v2-core/=lib/v2-core/contracts/",
+    "@uniswap/v3-periphery/=lib/v3-periphery/contracts/",
+    "@uniswap/v3-core/=lib/v3-core/",
 ]
+# [dependencies]
+# uniswap-v3-core = { git = "https://github.com/Uniswap/v3-core.git", branch = "main" }
+# uniswap-v3-periphery = { git = "https://github.com/Uniswap/v3-periphery.git", branch = "main" }
 
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

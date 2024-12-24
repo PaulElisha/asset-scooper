@@ -57,7 +57,7 @@ contract AssetScooperTest is Test, Constants, TestHelper {
     }
 
     function testVersion() public view {
-        assertEq(assetScooper.version(), "1.0.0");
+        assertEq(assetScooper.version(), "2.0.0");
     }
 
     function testSweepAsset() public {
