@@ -7,13 +7,13 @@ import "./Interfaces/IAssetScooper.sol";
 import "./interfaces/IWETH.sol";
 import "./Constants.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@uniswap/v3-periphery/interfaces/ISwapRouter.sol";
-import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import "@uniswap/v3-core/interfaces/IUniswapV3Factory.sol";
 
 contract AssetScooper is
     IAssetScooper,
@@ -39,7 +39,7 @@ contract AssetScooper is
         address _router,
         address factory,
         address _permit2
-    ) Ownable(_msgSender()) {
+    ) {
         weth = IWETH(_weth);
         swapRouter = ISwapRouter(_router);
         V3Factory = IUniswapV3Factory(factory);
