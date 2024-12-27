@@ -9,21 +9,17 @@ import {Vm} from "forge-std/Vm.sol";
 import "../../src/Constants.sol";
 
 contract TestHelper is Constants {
-    Vm private constant vm =
-        Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+    Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    bytes32 public constant _TOKEN_PERMISSIONS_TYPEHASH =
-        keccak256("TokenPermissions(address token,uint256 amount)");
+    bytes32 public constant _TOKEN_PERMISSIONS_TYPEHASH = keccak256("TokenPermissions(address token,uint256 amount)");
 
-    bytes32 public constant _PERMIT_TRANSFER_FROM_TYPEHASH =
-        keccak256(
-            "PermitTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline)TokenPermissions(address token,uint256 amount)"
-        );
+    bytes32 public constant _PERMIT_TRANSFER_FROM_TYPEHASH = keccak256(
+        "PermitTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline)TokenPermissions(address token,uint256 amount)"
+    );
 
-    bytes32 public constant _PERMIT_BATCH_TRANSFER_FROM_TYPEHASH =
-        keccak256(
-            "PermitBatchTransferFrom(TokenPermissions[] permitted,address spender,uint256 nonce,uint256 deadline)TokenPermissions(address token,uint256 amount)"
-        );
+    bytes32 public constant _PERMIT_BATCH_TRANSFER_FROM_TYPEHASH = keccak256(
+        "PermitBatchTransferFrom(TokenPermissions[] permitted,address spender,uint256 nonce,uint256 deadline)TokenPermissions(address token,uint256 amount)"
+    );
 
     modifier ensure(uint256 deadline) {
         require(deadline >= block.timestamp, "Test Helper: Expired");
@@ -34,11 +30,7 @@ contract TestHelper is Constants {
     ISignatureTransfer.TokenPermissions[] batchTokenPermissions;
     ISignatureTransfer.SignatureTransferDetails[] batchTransferDetails;
 
-    function createSwapParam(
-        address[] memory assets,
-        uint256[] memory outputAmounts,
-        uint256 deadline
-    )
+    function createSwapParam(address[] memory assets, uint256[] memory outputAmounts, uint256 deadline)
         public
         view
         ensure(deadline)
@@ -54,18 +46,14 @@ contract TestHelper is Constants {
         }
     }
 
-    function getBatchTokenPermissions(
-        address[] memory tokens,
-        uint256[] memory amounts
-    ) internal returns (ISignatureTransfer.TokenPermissions[] memory) {
+    function getBatchTokenPermissions(address[] memory tokens, uint256[] memory amounts)
+        internal
+        returns (ISignatureTransfer.TokenPermissions[] memory)
+    {
         if (tokens.length > 0 || amounts.length > 0) {
             for (uint256 i; i < tokens.length; i++) {
-                ISignatureTransfer.TokenPermissions
-                    memory tokenPermissions = ISignatureTransfer
-                        .TokenPermissions({
-                            token: tokens[i],
-                            amount: amounts[i]
-                        });
+                ISignatureTransfer.TokenPermissions memory tokenPermissions =
+                    ISignatureTransfer.TokenPermissions({token: tokens[i], amount: amounts[i]});
 
                 batchTokenPermissions.push(tokenPermissions);
             }
@@ -78,34 +66,24 @@ contract TestHelper is Constants {
         ISignatureTransfer.TokenPermissions[] memory _batchTokenPermissions,
         uint256 nonce,
         uint256 deadline
-    )
-        internal
-        view
-        ensure(deadline)
-        returns (ISignatureTransfer.PermitBatchTransferFrom memory)
-    {
-        ISignatureTransfer.PermitBatchTransferFrom
-            memory permitBatch = ISignatureTransfer.PermitBatchTransferFrom({
-                permitted: _batchTokenPermissions,
-                nonce: nonce,
-                deadline: deadline
-            });
+    ) internal view ensure(deadline) returns (ISignatureTransfer.PermitBatchTransferFrom memory) {
+        ISignatureTransfer.PermitBatchTransferFrom memory permitBatch = ISignatureTransfer.PermitBatchTransferFrom({
+            permitted: _batchTokenPermissions,
+            nonce: nonce,
+            deadline: deadline
+        });
 
         return permitBatch;
     }
 
-    function getBatchTransferDetails(
-        address[] memory to,
-        uint256[] memory amount
-    ) internal returns (ISignatureTransfer.SignatureTransferDetails[] memory) {
+    function getBatchTransferDetails(address[] memory to, uint256[] memory amount)
+        internal
+        returns (ISignatureTransfer.SignatureTransferDetails[] memory)
+    {
         if (to.length > 0 || amount.length > 0) {
             for (uint256 i; i < to.length; i++) {
-                ISignatureTransfer.SignatureTransferDetails
-                    memory transferDetail = ISignatureTransfer
-                        .SignatureTransferDetails({
-                            to: to[i],
-                            requestedAmount: amount[i]
-                        });
+                ISignatureTransfer.SignatureTransferDetails memory transferDetail =
+                    ISignatureTransfer.SignatureTransferDetails({to: to[i], requestedAmount: amount[i]});
                 batchTransferDetails.push(transferDetail);
             }
         }
@@ -123,9 +101,7 @@ contract TestHelper is Constants {
         bytes32[] memory tokenPermissionHashes = new bytes32[](numPermitted);
 
         for (uint256 i; i < numPermitted; i++) {
-            tokenPermissionHashes[i] = keccak256(
-                abi.encode(_TOKEN_PERMISSIONS_TYPEHASH, permit.permitted[i])
-            );
+            tokenPermissionHashes[i] = keccak256(abi.encode(_TOKEN_PERMISSIONS_TYPEHASH, permit.permitted[i]));
         }
 
         bytes32 msgHash = keccak256(
