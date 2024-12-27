@@ -7,7 +7,7 @@ interface IAssetScooper {
     error UnsuccessfulBalanceCall();
     error InexactTransfer();
     error NotEnoughOutputAmount(uint256 amountOut);
-    error MismatchLength();
+    error MismatchLength(uint256);
     error NoLiquidity(address token0, address token1);
 
     event AssetTransferred(

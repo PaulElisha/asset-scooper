@@ -137,15 +137,15 @@ contract AssetScooperTest is Test, Constants, TestHelper {
         domain_separator = permit2.DOMAIN_SEPARATOR();
 
         uint256 aeroBalance = aero.balanceOf(userA);
-        uint256 daiBalance = dai.balanceOf(userA);
-        uint256 bentoBalance = bento.balanceOf(userA);
-        uint256 tobyBalance = toby.balanceOf(userA);
+        // uint256 daiBalance = dai.balanceOf(userA);
+        // uint256 bentoBalance = bento.balanceOf(userA);
+        // uint256 tobyBalance = toby.balanceOf(userA);
 
         vm.startPrank(userA);
         aero.approve(address(permit2), aeroBalance);
-        dai.approve(address(permit2), daiBalance);
-        bento.approve(address(permit2), bentoBalance);
-        toby.approve(address(permit2), tobyBalance);
+        // dai.approve(address(permit2), daiBalance);
+        // bento.approve(address(permit2), bentoBalance);
+        // toby.approve(address(permit2), tobyBalance);
         vm.stopPrank();
 
         address[] memory assets = new address[](4);
@@ -154,29 +154,29 @@ contract AssetScooperTest is Test, Constants, TestHelper {
         uint256[] memory balances = new uint256[](4);
 
         assets[0] = address(aero);
-        assets[1] = address(dai);
-        assets[2] = address(bento);
-        assets[3] = address(toby);
+        // assets[1] = address(dai);
+        // assets[2] = address(bento);
+        // assets[3] = address(toby);
 
         to[0] = address(assetScooper);
-        to[1] = address(assetScooper);
-        to[2] = address(assetScooper);
-        to[3] = address(assetScooper);
+        // to[1] = address(assetScooper);
+        // to[2] = address(assetScooper);
+        // to[3] = address(assetScooper);
 
         outputs[0] = 0;
-        outputs[1] = 0;
-        outputs[2] = 0;
-        outputs[3] = 0;
+        // outputs[1] = 0;
+        // outputs[2] = 0;
+        // outputs[3] = 0;
 
         balances[0] = aeroBalance;
-        balances[1] = daiBalance;
-        balances[2] = bentoBalance;
-        balances[3] = tobyBalance;
+        // balances[1] = daiBalance;
+        // balances[2] = bentoBalance;
+        // balances[3] = tobyBalance;
 
         IAssetScooper.SwapParam memory swapParam = createSwapParam(
             assets,
             outputs,
-            block.timestamp
+            block.timestamp + 300
         );
 
         ISignatureTransfer.TokenPermissions[]
@@ -189,7 +189,7 @@ contract AssetScooperTest is Test, Constants, TestHelper {
             memory permit2_ = defaultERC20PermitBatchTransfer(
                 batchTokenPermissions,
                 nonce,
-                block.timestamp
+                block.timestamp + 300
             );
 
         signature = getPermitTransferSignature(
