@@ -7,22 +7,15 @@ import "./Interfaces/IAssetScooper.sol";
 import "./interfaces/IWETH.sol";
 import "./Constants.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@uniswap/v3-periphery/interfaces/ISwapRouter.sol";
-import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import "@uniswap/v3-core/interfaces/IUniswapV3Factory.sol";
 
-contract AssetScooper is
-    IAssetScooper,
-    Constants,
-    Context,
-    Ownable,
-    Pausable,
-    ReentrancyGuard
-{
+contract AssetScooper is IAssetScooper, Constants, Context, Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     address private immutable _owner;
@@ -34,12 +27,7 @@ contract AssetScooper is
     string private constant _version = "2.0.0";
     uint256 private constant STANDARD_DECIMAL = 18;
 
-    constructor(
-        address _weth,
-        address _router,
-        address factory,
-        address _permit2
-    ) Ownable(_msgSender()) {
+    constructor(address _weth, address _router, address factory, address _permit2) {
         weth = IWETH(_weth);
         swapRouter = ISwapRouter(_router);
         V3Factory = IUniswapV3Factory(factory);
@@ -59,25 +47,17 @@ contract AssetScooper is
     ) public whenNotPaused nonReentrant {
         uint256 len = param.assets.length;
 
-        if (
-            len != permit.permitted.length &&
-            len != param.minOutputAmounts.length &&
-            len <= 0
-        ) {
+        if (len != permit.permitted.length && len != param.minOutputAmounts.length && len <= 0) {
             revert MismatchLength();
         }
 
         address sender = _msgSender();
         Permit2 _permit2 = permit2;
 
-        (
-            ISignatureTransfer.SignatureTransferDetails[]
-                memory transferDetails,
-            uint256[] memory userBal
-        ) = fillSignatureTransferDetailsArray(param, permit, sender);
+        (ISignatureTransfer.SignatureTransferDetails[] memory transferDetails, uint256[] memory userBal) =
+            fillSignatureTransferDetailsArray(param, permit, sender);
 
-        ISwapRouter.ExactInputSingleParams[]
-            memory swapParams = fillSwapParamArray(userBal, param, sender);
+        ISwapRouter.ExactInputSingleParams[] memory swapParams = fillSwapParamArray(userBal, param, sender);
 
         preemptiveApproval(param, userBal);
 
@@ -88,16 +68,15 @@ contract AssetScooper is
         emit AssetSwapped(sender, param, amountOut);
     }
 
-    function swapTokens(
-        IAssetScooper.SwapParam memory param,
-        ISwapRouter.ExactInputSingleParams[] memory swapParams
-    ) private checkDeadline(param.deadline) returns (uint256 amountOut) {
+    function swapTokens(IAssetScooper.SwapParam memory param, ISwapRouter.ExactInputSingleParams[] memory swapParams)
+        private
+        checkDeadline(param.deadline)
+        returns (uint256 amountOut)
+    {
         uint256 len = param.assets.length;
 
         for (uint256 i; i < len; i++) {
-            try swapRouter.exactInputSingle(swapParams[i]) returns (
-                uint256 amount
-            ) {
+            try swapRouter.exactInputSingle(swapParams[i]) returns (uint256 amount) {
                 if (amount < param.minOutputAmounts[i]) {
                     revert NotEnoughOutputAmount(amount);
                 }
@@ -111,11 +90,7 @@ contract AssetScooper is
         console.log("Sender balance", amountOut);
     }
 
-    function fillSwapParamArray(
-        uint256[] memory amountIn,
-        IAssetScooper.SwapParam memory param,
-        address sender
-    )
+    function fillSwapParamArray(uint256[] memory amountIn, IAssetScooper.SwapParam memory param, address sender)
         private
         view
         returns (ISwapRouter.ExactInputSingleParams[] memory swapParams)
@@ -149,43 +124,28 @@ contract AssetScooper is
     )
         private
         view
-        returns (
-            ISignatureTransfer.SignatureTransferDetails[]
-                memory transferDetails,
-            uint256[] memory userBalance
-        )
+        returns (ISignatureTransfer.SignatureTransferDetails[] memory transferDetails, uint256[] memory userBalance)
     {
         uint256 len = param.assets.length;
         address[] memory assets = param.assets;
 
-        transferDetails = new ISignatureTransfer.SignatureTransferDetails[](
-            len
-        );
+        transferDetails = new ISignatureTransfer.SignatureTransferDetails[](len);
         userBalance = new uint256[](len);
 
         for (uint256 i; i < len; i++) {
             address asset = assets[i];
             uint8 decimals = IERC20Metadata(asset).decimals();
-            uint256 balance = normalizeTokenAmount(
-                IERC20(normalizeAddress(asset)).balanceOf(sender),
-                decimals
-            );
+            uint256 balance = normalizeTokenAmount(IERC20(normalizeAddress(asset)).balanceOf(sender), decimals);
 
             if (balance > 0 && asset == _permit.permitted[i].token) {
-                transferDetails[i] = ISignatureTransfer
-                    .SignatureTransferDetails({
-                        to: address(this),
-                        requestedAmount: balance
-                    });
+                transferDetails[i] =
+                    ISignatureTransfer.SignatureTransferDetails({to: address(this), requestedAmount: balance});
             }
             userBalance[i] = balance;
         }
     }
 
-    function preemptiveApproval(
-        IAssetScooper.SwapParam memory param,
-        uint256[] memory userBal
-    ) private {
+    function preemptiveApproval(IAssetScooper.SwapParam memory param, uint256[] memory userBal) private {
         uint256 len = param.assets.length;
 
         for (uint256 i; i < len; i++) {
@@ -196,18 +156,12 @@ contract AssetScooper is
     }
 
     function approveIfNeeded(address asset, uint256 userBal) private {
-        uint256 currentAllowance = IERC20(asset).allowance(
-            address(this),
-            address(swapRouter)
-        );
+        uint256 currentAllowance = IERC20(asset).allowance(address(this), address(swapRouter));
 
         if (currentAllowance < userBal) {
             uint256 approveAmount = userBal - currentAllowance;
 
-            IERC20(asset).safeIncreaseAllowance(
-                address(swapRouter),
-                approveAmount
-            );
+            IERC20(asset).safeIncreaseAllowance(address(swapRouter), approveAmount);
         }
     }
 
@@ -215,10 +169,7 @@ contract AssetScooper is
         return address(uint160(addr));
     }
 
-    function normalizeTokenAmount(
-        uint256 amount,
-        uint8 decimal
-    ) private pure returns (uint256) {
+    function normalizeTokenAmount(uint256 amount, uint8 decimal) private pure returns (uint256) {
         if (decimal > STANDARD_DECIMAL) {
             return amount / 10 ** (decimal - STANDARD_DECIMAL);
         } else if (decimal < STANDARD_DECIMAL) {
@@ -227,10 +178,7 @@ contract AssetScooper is
         return amount;
     }
 
-    function getPoolFee(
-        address tokenIn,
-        address tokenOut
-    ) private view returns (uint24) {
+    function getPoolFee(address tokenIn, address tokenOut) private view returns (uint24) {
         // uint24[3] memory feeTier;
         // feeTier[0] = 500;
         // feeTier[1] = 3000;
@@ -250,12 +198,7 @@ contract AssetScooper is
         revert("No valid pool");
     }
 
-    function owner()
-        public
-        view
-        override(Ownable, IAssetScooper)
-        returns (address)
-    {
+    function owner() public view override(Ownable, IAssetScooper) returns (address) {
         return _owner;
     }
 
