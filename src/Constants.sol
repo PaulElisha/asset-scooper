@@ -16,6 +16,8 @@ abstract contract Constants {
     address public constant DAI = 0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb;
     address public constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
 
+    uint256 public constant STANDARD_DECIMAL = 18;
+
     // address public constant PRANK_USER =
     //     0xCafc0Cd0eC8DD6F69C68AdBDEc9F2B7EAFeE931f;
 

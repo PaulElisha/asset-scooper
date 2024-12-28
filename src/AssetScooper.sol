@@ -12,7 +12,7 @@ import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@uniswap/v3-periphery/interfaces/ISwapRouter.sol";
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 
 contract AssetScooper is
@@ -32,7 +32,6 @@ contract AssetScooper is
     Permit2 public immutable permit2;
 
     string private constant _version = "2.0.0";
-    uint256 private constant STANDARD_DECIMAL = 18;
 
     constructor(
         address _weth,
@@ -60,8 +59,8 @@ contract AssetScooper is
         uint256 len = param.assets.length;
 
         if (
-            len != permit.permitted.length ||
-            len != param.minOutputAmounts.length ||
+            len != permit.permitted.length &&
+            len != param.minOutputAmounts.length &&
             len <= 0
         ) {
             revert MismatchLength(len);
@@ -76,50 +75,37 @@ contract AssetScooper is
             uint256[] memory userBal
         ) = fillSignatureTransferDetailsArray(param, permit, sender);
 
-        // ISwapRouter.ExactInputSingleParams[]
-        //     memory swapParams = fillSwapParamArray(userBal, param, sender);
+        ISwapRouter.ExactInputSingleParams[]
+            memory swapParams = fillSwapParamArray(userBal, param, sender);
 
         preemptiveApproval(param, userBal);
 
         _permit2.permitTransferFrom(permit, transferDetails, sender, signature);
 
         emit AssetTransferred(param, sender, address(this));
-        uint256 amountOut = swapTokens(param, userBal);
+        uint256 amountOut = swapTokens(param, swapParams);
         emit AssetSwapped(sender, param, amountOut);
     }
 
     function swapTokens(
         IAssetScooper.SwapParam memory param,
-        uint256[] memory amountIn
+        ISwapRouter.ExactInputSingleParams[] memory swapParams
     ) private checkDeadline(param.deadline) returns (uint256 amountOut) {
         uint256 len = param.assets.length;
 
         // amountOut = swapRouter.exactInputSingle(params);
 
         for (uint256 i; i < len; i++) {
-            address tokenIn = normalizeAddress(param.assets[i]);
-            uint24 poolFee = getPoolFee(tokenIn, param.tokenOut);
-
-            ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
-                .ExactInputSingleParams({
-                    tokenIn: tokenIn,
-                    tokenOut: param.tokenOut,
-                    fee: poolFee,
-                    recipient: msg.sender,
-                    deadline: block.timestamp,
-                    amountIn: amountIn[i],
-                    amountOutMinimum: param.minOutputAmounts[i],
-                    sqrtPriceLimitX96: 0
-                });
-
-            try swapRouter.exactInputSingle(params) returns (uint256 amount) {
+            try swapRouter.exactInputSingle(swapParams[i]) returns (
+                uint256 amount
+            ) {
                 if (amount < param.minOutputAmounts[i]) {
                     revert NotEnoughOutputAmount(amount);
                 }
 
                 amountOut += amount;
             } catch Error(string memory reason) {
-                console.log("Swap failed for tokenIn:", params.tokenIn);
+                console.log("Swap failed for tokenIn:", param.assets[i]);
                 revert(string(abi.encodePacked("Swap failed: ", reason)));
             }
         }
@@ -211,16 +197,19 @@ contract AssetScooper is
     }
 
     function approveIfNeeded(address asset, uint256 userBal) private {
-        // uint256 currentAllowance = IERC20(asset).allowance(
-        //     address(this),
-        //     address(swapRouter)
-        // );
+        uint256 currentAllowance = IERC20(asset).allowance(
+            address(this),
+            address(swapRouter)
+        );
 
-        IERC20(asset).approve(address(swapRouter), userBal);
+        if (currentAllowance < userBal) {
+            uint256 approveAmount = userBal - currentAllowance;
 
-        // if (currentAllowance < userBal) {
-        //     uint256 approveAmount = userBal - currentAllowance;
-        // }
+            IERC20(asset).safeIncreaseAllowance(
+                address(swapRouter),
+                approveAmount
+            );
+        }
     }
 
     function normalizeAddress(address addr) private pure returns (address) {
@@ -238,25 +227,6 @@ contract AssetScooper is
         }
         return amount;
     }
-
-    // function checkPool(
-    //     address tokenIn,
-    //     address tokenOut
-    // ) private view returns (bool) {
-    //     uint24[] memory feeTier = new uint24[](3);
-    //     feeTier[0] = 500;
-    //     feeTier[1] = 3000;
-    //     feeTier[2] = 10000;
-
-    //     uint256 len = feeTier.length;
-
-    //     for (uint256 i; i < len; i++) {
-    //         address pool = V3Factory.getPool(tokenIn, tokenOut, feeTier[i]);
-    //         if (pool != address(0)) {
-
-    //         }
-    //     }
-    // }
 
     function getPoolFee(
         address tokenIn,

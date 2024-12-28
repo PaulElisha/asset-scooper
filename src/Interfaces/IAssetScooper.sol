@@ -10,16 +10,8 @@ interface IAssetScooper {
     error MismatchLength(uint256);
     error NoLiquidity(address token0, address token1);
 
-    event AssetTransferred(
-        SwapParam indexed param,
-        address indexed receiver,
-        address indexed sender
-    );
-    event AssetSwapped(
-        address indexed sender,
-        SwapParam indexed param,
-        uint256 indexed amountOut
-    );
+    event AssetTransferred(SwapParam indexed param, address indexed receiver, address indexed sender);
+    event AssetSwapped(address indexed sender, SwapParam indexed param, uint256 indexed amountOut);
     event InsufficientLiquidity(address indexed token0, address indexed token1);
 
     struct SwapParam {
