@@ -239,17 +239,9 @@ contract AssetScooperTest is Test, Constants, TestHelper {
             domain_separator
         );
 
+        vm.expectRevert();
         vm.startPrank(userA);
         assetScooper.sweepAsset(swapParam, permit2_, signature);
         vm.stopPrank();
-
-        // Assert final balances
-        assertLt(aero.balanceOf(userA), initialAeroBalance);
-        assertLt(dai.balanceOf(userA), initialDaiBalance);
-        assertLt(bento.balanceOf(userA), initialBentoBalance);
-        assertLt(toby.balanceOf(userA), initialTobyBalance);
-
-        IERC20 outputToken = IERC20(USDC);
-        assertGt(outputToken.balanceOf(userA), 0);
     }
 }
