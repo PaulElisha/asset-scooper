@@ -34,6 +34,7 @@ contract AssetScooper is
 
     string private constant _version = "2.0.0";
 
+    // 0xac9650d8
     // bytes4 public constant SELECTOR = ; // bytes4(keccak256("multicall(bytes[])"));
 
     constructor(
@@ -120,29 +121,22 @@ contract AssetScooper is
         for (uint256 i; i < len; i++) {
             address tokenIn = normalizeAddress(assets[i]);
             uint24 poolFee = getPoolFee(tokenIn, tokenOut);
-            bool poolExists = poolExistsWithLiquidity(
-                tokenIn,
-                tokenOut,
-                poolFee
-            );
+            bool hasLiquidity = hasliquidity(tokenIn, tokenOut, poolFee);
 
-            if (poolExists) {
-                bytes memory encData = abi.encodeWithSelector(
+            if (hasLiquidity)
+                calls[i] = abi.encodeWithSelector(
                     ISwapRouter.exactInputSingle.selector,
                     ISwapRouter.ExactInputSingleParams({
                         tokenIn: tokenIn,
                         tokenOut: tokenOut,
                         fee: poolFee,
                         recipient: sender,
-                        deadline: param.deadline,
+                        deadline: block.timestamp,
                         amountIn: amountIn[i],
                         amountOutMinimum: param.minOutputAmounts[i],
                         sqrtPriceLimitX96: 0
                     })
                 );
-
-                calls[i] = encData;
-            }
         }
     }
 
@@ -196,6 +190,7 @@ contract AssetScooper is
             success = approveIfNeeded(param.assets[i], userBal[i]);
             if (!success) return false;
         }
+        console.log("Approved SwapRouter Successfully!");
         return true;
     }
 
@@ -215,10 +210,9 @@ contract AssetScooper is
                 address(swapRouter),
                 approveAmount
             );
-
             return true;
         }
-
+        console.log("Approval Failed!", asset);
         return false;
     }
 
@@ -230,12 +224,9 @@ contract AssetScooper is
         uint256 amount,
         uint8 decimal
     ) private pure returns (uint256) {
-        if (decimal > STANDARD_DECIMAL) {
-            return amount / 10 ** (decimal - STANDARD_DECIMAL);
-        } else if (decimal < STANDARD_DECIMAL) {
-            return amount * 10 ** (STANDARD_DECIMAL - decimal);
-        }
-        return amount;
+        if (decimal < STANDARD_DECIMAL) {
+            return amount * (10 ** (STANDARD_DECIMAL - decimal));
+        } else return amount;
     }
 
     function getPoolFee(
@@ -254,6 +245,7 @@ contract AssetScooper is
             address pool = v3factory.getPool(tokenIn, tokenOut, feeTier[index]);
 
             if (pool != address(0)) {
+                console.log("Found fee for", tokenIn, tokenOut, feeTier[index]);
                 return feeTier[index];
             }
 
@@ -262,23 +254,21 @@ contract AssetScooper is
         revert PoolFeeNotFound(tokenIn, tokenOut);
     }
 
-    function poolExistsWithLiquidity(
+    function hasliquidity(
         address tokenIn,
         address tokenOut,
         uint24 fee
     ) private view returns (bool) {
         address _pool = v3factory.getPool(tokenIn, tokenOut, fee);
-        (bool success, bytes memory data) = _pool.staticcall(
-            abi.encodeWithSignature("liquidity()")
-        );
-        if (!success) {
-            return false;
+        console.log("Found pool for", tokenIn, tokenOut, _pool);
+        IUniswapV3Pool pool = IUniswapV3Pool(_pool);
+        uint128 liquidity = pool.liquidity();
+        if (liquidity > 0) {
+            console.log("Pool > ", _pool, "has liquidity >", liquidity);
+            return true;
+        } else {
+            revert PoolHasNoLiquidity(tokenIn, tokenOut, _pool);
         }
-
-        uint128 liquidity = abi.decode(data, (uint128));
-        if (!(liquidity > 0))
-            revert PoolHasNoLiquidity(_pool, tokenIn, tokenOut);
-        else return true;
     }
 
     function owner()

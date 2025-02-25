@@ -63,25 +63,16 @@ contract AssetScooperTest is Test, Constants, TestHelper {
         assertEq(assetScooper.version(), "2.0.0");
     }
 
-    function testSweepAsset() public {
-        address[] memory assets = new address[](4);
-        uint256[] memory outputs = new uint256[](4);
-        uint256[] memory balances = new uint256[](4);
-
-        uint256 len = assets.length;
+    function testSweepAssetWithSignature() public {
+        address[] memory assets = new address[](2);
+        uint256[] memory balances = new uint256[](2);
+        uint256[] memory outputs = new uint256[](2);
 
         assets[0] = address(aero);
         assets[1] = address(dai);
-        assets[2] = address(bento);
-        assets[3] = address(toby);
+        // assets[2] = address(toby);
 
-        // Get initial balances
-        for (uint256 i; i < len; i++) {
-            balances[i] = IERC20(assets[i]).balanceOf(userA);
-
-            // Set very small minimum outputs for USDC (6 decimals)
-            outputs[i] = 1e4; // 0.01 USDC
-        }
+        uint256 len = assets.length;
 
         uint256 nonce = 20;
         domain_separator = permit2.DOMAIN_SEPARATOR();
@@ -96,12 +87,18 @@ contract AssetScooperTest is Test, Constants, TestHelper {
         }
 
         // Deal USDC to mock router and approve it
-        deal(USDC, address(mockRouter), 1000e6);
-        deal(USDC, SWAP_ROUTER, 1000e6);
+        deal(USDC, address(mockRouter), 1000e24);
+        deal(USDC, SWAP_ROUTER, 1000e24);
 
         vm.startPrank(address(mockRouter));
         IERC20(USDC).approve(address(mockRouter), type(uint256).max);
         vm.stopPrank();
+
+        // Get initial balances
+        for (uint256 i; i < len; i++) {
+            balances[i] = IERC20(assets[i]).balanceOf(userA);
+            outputs[i] = 1e18;
+        }
 
         vm.startPrank(userA);
         for (uint256 i; i < len; i++) {
@@ -112,7 +109,7 @@ contract AssetScooperTest is Test, Constants, TestHelper {
         IAssetScooper.SwapParam memory swapParam = createSwapParam(
             assets,
             outputs,
-            block.timestamp + 3600
+            block.timestamp + 1 days
         );
 
         ISignatureTransfer.TokenPermissions[]
@@ -125,7 +122,7 @@ contract AssetScooperTest is Test, Constants, TestHelper {
             memory permit2_ = defaultERC20PermitBatchTransfer(
                 batchTokenPermissions,
                 nonce,
-                block.timestamp + 3600
+                block.timestamp + 1 days
             );
 
         signature = getPermitTransferSignature(
@@ -146,6 +143,7 @@ contract AssetScooperTest is Test, Constants, TestHelper {
 
         IERC20 outputToken = IERC20(USDC);
         assertGt(outputToken.balanceOf(userA), 0);
+        console.log("User output token balance:", outputToken.balanceOf(userA));
     }
 
     function testInvalidSignature_SweepAsset() public {

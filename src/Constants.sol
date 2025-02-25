@@ -9,9 +9,9 @@ abstract contract Constants {
     address public constant factory =
         0x33128a8fC17869897dcE68Ed026d694621f6FDfD;
 
-    address public constant AERO = 0x3C281A39944a2319aA653D81Cfd93Ca10983D234;
+    address public constant AERO = 0x940181a94A35A4569E4529A3CDfB74e38FD98631;
     address public constant WGC = 0xAfb89a09D82FBDE58f18Ac6437B3fC81724e4dF6;
-    address public constant TOBY = 0xb8D98a102b0079B69FFbc760C8d857A31653e56e;
+    address public constant TOBY = 0x98d0baa52b2D063E780DE12F615f963Fe8537553;
     address public constant BENTO = 0x9DE16c805A3227b9b92e39a446F9d56cf59fe640;
     address public constant DAI = 0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb;
     address public constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
