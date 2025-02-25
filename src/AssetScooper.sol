@@ -77,7 +77,7 @@ contract AssetScooper is
             uint256[] memory userBal
         ) = fillSignatureTransferDetailsArray(param, permit, sender);
 
-        bytes[] memory callData = fillSwapParamArray(userBal, param, sender);
+        bytes[] memory callData = fillSwapCallData(userBal, param, sender);
 
         if (!preemptiveApproval(param, userBal))
             revert CannotApproveBalanceZeroOrLess();
@@ -104,7 +104,7 @@ contract AssetScooper is
         }
     }
 
-    function fillSwapParamArray(
+    function fillSwapCallData(
         uint256[] memory amountIn,
         IAssetScooper.SwapParam memory param,
         address sender
@@ -239,20 +239,23 @@ contract AssetScooper is
         address tokenIn,
         address tokenOut
     ) private view returns (uint24) {
-        uint24[] memory feeTier = new uint24[](3);
+        uint24[] memory feeTier = new uint24[](4);
         feeTier[0] = 100;
         feeTier[1] = 500;
         feeTier[2] = 3000;
         feeTier[3] = 10000;
 
+        uint256 index = 0;
         uint256 len = feeTier.length;
-        for (uint256 i; i < len; i++) {
-            address pool = tokenOut == address(weth)
-                ? V3Factory.getPool(tokenIn, tokenOut, feeTier[i])
-                : V3Factory.getPool(tokenIn, USDC, feeTier[i]);
-            if (pool != address(0)) return feeTier[i];
-        }
+        while (index < len) {
+            address pool = V3Factory.getPool(tokenIn, tokenOut, feeTier[index]);
 
+            if (pool != address(0)) {
+                return feeTier[index];
+            }
+
+            index++;
+        }
         revert PoolFeeNotFound(tokenIn, tokenOut);
     }
 
