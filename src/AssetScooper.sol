@@ -29,7 +29,7 @@ contract AssetScooper is
     address private immutable _owner;
     IWETH private immutable weth;
     ISwapRouter public immutable swapRouter;
-    IUniswapV3Factory public immutable V3Factory;
+    IUniswapV3Factory public immutable v3factory;
     Permit2 public immutable permit2;
 
     string private constant _version = "2.0.0";
@@ -44,7 +44,7 @@ contract AssetScooper is
     ) Ownable(_msgSender()) {
         weth = IWETH(_weth);
         swapRouter = ISwapRouter(_router);
-        V3Factory = IUniswapV3Factory(factory);
+        v3factory = IUniswapV3Factory(factory);
         permit2 = Permit2(_permit2);
         _owner = _msgSender();
     }
@@ -251,7 +251,7 @@ contract AssetScooper is
         uint256 index = 0;
         uint256 len = feeTier.length;
         while (index < len) {
-            address pool = V3Factory.getPool(tokenIn, tokenOut, feeTier[index]);
+            address pool = v3factory.getPool(tokenIn, tokenOut, feeTier[index]);
 
             if (pool != address(0)) {
                 return feeTier[index];
@@ -267,7 +267,7 @@ contract AssetScooper is
         address tokenOut,
         uint24 fee
     ) private view returns (bool) {
-        address _pool = V3Factory.getPool(tokenIn, tokenOut, fee);
+        address _pool = v3factory.getPool(tokenIn, tokenOut, fee);
         (bool success, bytes memory data) = _pool.staticcall(
             abi.encodeWithSignature("liquidity()")
         );
