@@ -33,7 +33,8 @@ contract AssetScooper is
     Permit2 public immutable permit2;
 
     string private constant _version = "2.0.0";
-    bytes4 public constant SELECTOR = 0xac9650d8; // bytes4(keccak256("multicall(bytes[])"));
+
+    // bytes4 public constant SELECTOR = ; // bytes4(keccak256("multicall(bytes[])"));
 
     constructor(
         address _weth,
@@ -94,7 +95,7 @@ contract AssetScooper is
     ) private returns (uint256 amountOut) {
         require(calls.length > 0, "No valid swaps to execute");
 
-        bytes memory multicallData = abi.encodeWithSelector(SELECTOR, calls);
+        bytes memory multicallData = abi.encodeWithSelector(0xac9650d8, calls);
 
         (bool success, bytes memory result) = router.call(multicallData);
         require(success, "Swap failed");
