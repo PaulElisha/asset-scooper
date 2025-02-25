@@ -11,6 +11,13 @@ remappings = [
 ]
 [profile.permit2]
 solc_version = "0.8.17"
+
+
+[rpc_endpoints]
+base = "${BASE_RPC_URL}"
+
+[etherscan]
+base = { key = "${BASESCAN_API_KEY}" }
 # [dependencies]
 # uniswap-v3-core = { git = "https://github.com/Uniswap/v3-core.git", branch = "main" }
 # uniswap-v3-periphery = { git = "https://github.com/Uniswap/v3-periphery.git", branch = "main" }

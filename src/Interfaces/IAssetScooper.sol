@@ -4,14 +4,22 @@ pragma solidity ^0.8.0;
 import "permit2/src/interfaces/ISignatureTransfer.sol";
 
 interface IAssetScooper {
-    error UnsuccessfulBalanceCall();
-    error InexactTransfer();
     error NotEnoughOutputAmount(uint256 amountOut);
     error MismatchLength(uint256);
-    error NoLiquidity(address token0, address token1);
+    error CannotApproveBalanceZeroOrLess();
+    error PoolHasNoLiquidity(address pool, address tokenIn, address tokenOut);
+    error PoolFeeNotFound(address tokenIn, address tokenOut);
 
-    event AssetTransferred(SwapParam indexed param, address indexed receiver, address indexed sender);
-    event AssetSwapped(address indexed sender, SwapParam indexed param, uint256 indexed amountOut);
+    event AssetTransferred(
+        SwapParam indexed param,
+        address indexed receiver,
+        address indexed sender
+    );
+    event SwapExecuted(
+        address indexed sender,
+        SwapParam indexed param,
+        uint256 indexed amountOut
+    );
     event InsufficientLiquidity(address indexed token0, address indexed token1);
 
     struct SwapParam {

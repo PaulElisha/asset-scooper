@@ -40,7 +40,7 @@ contract AssetScooperTest is Test, Constants, TestHelper {
 
         permit2 = assetScooper.permit2();
 
-        privateKey = vm.envUint("PRIVATE_KEY");
+        privateKey = vm.envUint("private_key");
         userA = vm.addr(privateKey);
 
         console2.log(userA);
@@ -64,6 +64,25 @@ contract AssetScooperTest is Test, Constants, TestHelper {
     }
 
     function testSweepAsset() public {
+        address[] memory assets = new address[](4);
+        uint256[] memory outputs = new uint256[](4);
+        uint256[] memory balances = new uint256[](4);
+
+        uint256 len = assets.length;
+
+        assets[0] = address(aero);
+        assets[1] = address(dai);
+        assets[2] = address(bento);
+        assets[3] = address(toby);
+
+        // Get initial balances
+        for (uint256 i; i < len; i++) {
+            balances[i] = IERC20(assets[i]).balanceOf(userA);
+
+            // Set very small minimum outputs for USDC (6 decimals)
+            outputs[i] = 1e4; // 0.01 USDC
+        }
+
         uint256 nonce = 20;
         domain_separator = permit2.DOMAIN_SEPARATOR();
 
@@ -72,10 +91,9 @@ contract AssetScooperTest is Test, Constants, TestHelper {
         vm.etch(SWAP_ROUTER, address(mockRouter).code);
 
         // Deal tokens to userA
-        deal(address(aero), userA, 100e18);
-        deal(address(dai), userA, 100e18);
-        deal(address(bento), userA, 100e18);
-        deal(address(toby), userA, 100e18);
+        for (uint256 i; i < len; i++) {
+            deal(address(assets[i]), userA, 100e18);
+        }
 
         // Deal USDC to mock router and approve it
         deal(USDC, address(mockRouter), 1000e6);
@@ -85,38 +103,11 @@ contract AssetScooperTest is Test, Constants, TestHelper {
         IERC20(USDC).approve(address(mockRouter), type(uint256).max);
         vm.stopPrank();
 
-        // Get initial balances
-        uint256 initialAeroBalance = aero.balanceOf(userA);
-        uint256 initialDaiBalance = dai.balanceOf(userA);
-        uint256 initialBentoBalance = bento.balanceOf(userA);
-        uint256 initialTobyBalance = toby.balanceOf(userA);
-
         vm.startPrank(userA);
-        aero.approve(address(permit2), type(uint256).max);
-        dai.approve(address(permit2), type(uint256).max);
-        bento.approve(address(permit2), type(uint256).max);
-        toby.approve(address(permit2), type(uint256).max);
+        for (uint256 i; i < len; i++) {
+            IERC20(assets[i]).approve(address(permit2), type(uint256).max);
+        }
         vm.stopPrank();
-
-        address[] memory assets = new address[](4);
-        uint256[] memory outputs = new uint256[](4);
-        uint256[] memory balances = new uint256[](4);
-
-        assets[0] = address(aero);
-        assets[1] = address(dai);
-        assets[2] = address(bento);
-        assets[3] = address(toby);
-
-        balances[0] = initialAeroBalance;
-        balances[1] = initialDaiBalance;
-        balances[2] = initialBentoBalance;
-        balances[3] = initialTobyBalance;
-
-        // Set very small minimum outputs for USDC (6 decimals)
-        outputs[0] = 1e4; // 0.01 USDC
-        outputs[1] = 1e4;
-        outputs[2] = 1e4;
-        outputs[3] = 1e4;
 
         IAssetScooper.SwapParam memory swapParam = createSwapParam(
             assets,
@@ -149,10 +140,9 @@ contract AssetScooperTest is Test, Constants, TestHelper {
         vm.stopPrank();
 
         // Assert final balances
-        assertLt(aero.balanceOf(userA), initialAeroBalance);
-        assertLt(dai.balanceOf(userA), initialDaiBalance);
-        assertLt(bento.balanceOf(userA), initialBentoBalance);
-        assertLt(toby.balanceOf(userA), initialTobyBalance);
+        for (uint256 i; i < len; i++) {
+            assertLt(IERC20(assets[i]).balanceOf(userA), balances[i]);
+        }
 
         IERC20 outputToken = IERC20(USDC);
         assertGt(outputToken.balanceOf(userA), 0);

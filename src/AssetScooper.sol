@@ -14,6 +14,7 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
 contract AssetScooper is
     IAssetScooper,
@@ -32,6 +33,7 @@ contract AssetScooper is
     Permit2 public immutable permit2;
 
     string private constant _version = "2.0.0";
+    bytes4 public constant SELECTOR = 0xac9650d8; // bytes4(keccak256("multicall(bytes[])"));
 
     constructor(
         address _weth,
@@ -55,7 +57,7 @@ contract AssetScooper is
         IAssetScooper.SwapParam memory param,
         ISignatureTransfer.PermitBatchTransferFrom memory permit,
         bytes memory signature
-    ) public whenNotPaused nonReentrant {
+    ) public checkDeadline(param.deadline) whenNotPaused nonReentrant {
         uint256 len = param.assets.length;
 
         if (
@@ -75,71 +77,69 @@ contract AssetScooper is
             uint256[] memory userBal
         ) = fillSignatureTransferDetailsArray(param, permit, sender);
 
-        ISwapRouter.ExactInputSingleParams[]
-            memory swapParams = fillSwapParamArray(userBal, param, sender);
+        bytes[] memory callData = fillSwapParamArray(userBal, param, sender);
 
-        preemptiveApproval(param, userBal);
+        if (!preemptiveApproval(param, userBal))
+            revert CannotApproveBalanceZeroOrLess();
 
         _permit2.permitTransferFrom(permit, transferDetails, sender, signature);
 
         emit AssetTransferred(param, sender, address(this));
-        uint256 amountOut = swapTokens(param, swapParams);
-        emit AssetSwapped(sender, param, amountOut);
+        uint256 amountOut = batchSwap(callData);
+        emit SwapExecuted(sender, param, amountOut);
     }
 
-    function swapTokens(
-        IAssetScooper.SwapParam memory param,
-        ISwapRouter.ExactInputSingleParams[] memory swapParams
-    ) private checkDeadline(param.deadline) returns (uint256 amountOut) {
-        uint256 len = param.assets.length;
+    function batchSwap(
+        bytes[] memory calls
+    ) private returns (uint256 amountOut) {
+        require(calls.length > 0, "No valid swaps to execute");
 
-        // amountOut = swapRouter.exactInputSingle(params);
+        bytes memory multicallData = abi.encodeWithSelector(SELECTOR, calls);
 
-        for (uint256 i; i < len; i++) {
-            try swapRouter.exactInputSingle(swapParams[i]) returns (
-                uint256 amount
-            ) {
-                if (amount < param.minOutputAmounts[i]) {
-                    revert NotEnoughOutputAmount(amount);
-                }
+        (bool success, bytes memory result) = router.call(multicallData);
+        require(success, "Swap failed");
 
-                amountOut += amount;
-            } catch Error(string memory reason) {
-                console.log("Swap failed for tokenIn:", param.assets[i]);
-                revert(string(abi.encodePacked("Swap failed: ", reason)));
-            }
+        if (result.length > 0) {
+            amountOut = abi.decode(result, (uint256));
         }
-        console.log("Sender balance", amountOut);
     }
 
     function fillSwapParamArray(
         uint256[] memory amountIn,
         IAssetScooper.SwapParam memory param,
         address sender
-    )
-        private
-        view
-        returns (ISwapRouter.ExactInputSingleParams[] memory swapParams)
-    {
+    ) private view returns (bytes[] memory calls) {
         uint256 len = param.assets.length;
-        swapParams = new ISwapRouter.ExactInputSingleParams[](len);
+        calls = new bytes[](len);
 
         require(param.tokenOut == address(weth) || param.tokenOut == USDC);
 
         for (uint256 i; i < len; i++) {
             address tokenIn = normalizeAddress(param.assets[i]);
             uint24 poolFee = getPoolFee(tokenIn, param.tokenOut);
+            bool poolExists = poolExistsWithLiquidity(
+                tokenIn,
+                param.tokenOut,
+                poolFee
+            );
 
-            swapParams[i] = ISwapRouter.ExactInputSingleParams({
-                tokenIn: tokenIn,
-                tokenOut: param.tokenOut,
-                fee: poolFee,
-                recipient: sender,
-                deadline: param.deadline,
-                amountIn: amountIn[i],
-                amountOutMinimum: param.minOutputAmounts[i],
-                sqrtPriceLimitX96: 1
-            });
+            if (poolExists) {
+                bytes memory encData = abi.encodeWithSelector(
+                    ISwapRouter.exactInputSingle.selector,
+                    ISwapRouter.ExactInputSingleParams({
+                        tokenIn: tokenIn,
+                        tokenOut: param.tokenOut,
+                        fee: poolFee,
+                        recipient: sender,
+                        deadline: param.deadline,
+                        amountIn: amountIn[i],
+                        amountOutMinimum: param.minOutputAmounts[i],
+                        sqrtPriceLimitX96: 0
+                    })
+                );
+
+                calls[i] = encData;
+            }
         }
     }
 
@@ -165,10 +165,10 @@ contract AssetScooper is
         userBalance = new uint256[](len);
 
         for (uint256 i; i < len; i++) {
-            address asset = assets[i];
+            address asset = normalizeAddress(assets[i]);
             uint8 decimals = IERC20Metadata(asset).decimals();
             uint256 balance = normalizeTokenAmount(
-                IERC20(normalizeAddress(asset)).balanceOf(sender),
+                IERC20(asset).balanceOf(sender),
                 decimals
             );
 
@@ -186,17 +186,20 @@ contract AssetScooper is
     function preemptiveApproval(
         IAssetScooper.SwapParam memory param,
         uint256[] memory userBal
-    ) private {
+    ) private returns (bool success) {
         uint256 len = param.assets.length;
 
         for (uint256 i; i < len; i++) {
-            if (userBal[i] > 0) {
-                approveIfNeeded(param.assets[i], userBal[i]);
-            }
+            success = approveIfNeeded(param.assets[i], userBal[i]);
+            if (!success) return false;
         }
+        return true;
     }
 
-    function approveIfNeeded(address asset, uint256 userBal) private {
+    function approveIfNeeded(
+        address asset,
+        uint256 userBal
+    ) private returns (bool success) {
         uint256 currentAllowance = IERC20(asset).allowance(
             address(this),
             address(swapRouter)
@@ -209,7 +212,11 @@ contract AssetScooper is
                 address(swapRouter),
                 approveAmount
             );
+
+            return true;
         }
+
+        return false;
     }
 
     function normalizeAddress(address addr) private pure returns (address) {
@@ -232,23 +239,40 @@ contract AssetScooper is
         address tokenIn,
         address tokenOut
     ) private view returns (uint24) {
-        // uint24[3] memory feeTier;
-        // feeTier[0] = 500;
-        // feeTier[1] = 3000;
-        // feeTier[2] = 10000;
-
         uint24[] memory feeTier = new uint24[](3);
-        feeTier[0] = 500;
-        feeTier[1] = 3000;
-        feeTier[2] = 10000;
+        feeTier[0] = 100;
+        feeTier[1] = 500;
+        feeTier[2] = 3000;
+        feeTier[3] = 10000;
 
         uint256 len = feeTier.length;
         for (uint256 i; i < len; i++) {
-            address pool = V3Factory.getPool(tokenIn, tokenOut, feeTier[i]);
+            address pool = tokenOut == address(weth)
+                ? V3Factory.getPool(tokenIn, tokenOut, feeTier[i])
+                : V3Factory.getPool(tokenIn, USDC, feeTier[i]);
             if (pool != address(0)) return feeTier[i];
         }
 
-        revert("No valid pool");
+        revert PoolFeeNotFound(tokenIn, tokenOut);
+    }
+
+    function poolExistsWithLiquidity(
+        address tokenIn,
+        address tokenOut,
+        uint24 fee
+    ) private view returns (bool) {
+        address _pool = V3Factory.getPool(tokenIn, tokenOut, fee);
+        (bool success, bytes memory data) = _pool.staticcall(
+            abi.encodeWithSignature("liquidity()")
+        );
+        if (!success) {
+            return false;
+        }
+
+        uint128 liquidity = abi.decode(data, (uint128));
+        if (!(liquidity > 0))
+            revert PoolHasNoLiquidity(_pool, tokenIn, tokenOut);
+        else return true;
     }
 
     function owner()
