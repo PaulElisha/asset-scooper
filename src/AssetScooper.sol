@@ -111,16 +111,18 @@ contract AssetScooper is
         address sender
     ) private view returns (bytes[] memory calls) {
         uint256 len = param.assets.length;
+        address[] memory assets = param.assets;
         calls = new bytes[](len);
-
-        require(param.tokenOut == address(weth) || param.tokenOut == USDC);
+        address tokenOut = param.tokenOut == address(weth)
+            ? address(weth)
+            : USDC;
 
         for (uint256 i; i < len; i++) {
-            address tokenIn = normalizeAddress(param.assets[i]);
-            uint24 poolFee = getPoolFee(tokenIn, param.tokenOut);
+            address tokenIn = normalizeAddress(assets[i]);
+            uint24 poolFee = getPoolFee(tokenIn, tokenOut);
             bool poolExists = poolExistsWithLiquidity(
                 tokenIn,
-                param.tokenOut,
+                tokenOut,
                 poolFee
             );
 
@@ -129,7 +131,7 @@ contract AssetScooper is
                     ISwapRouter.exactInputSingle.selector,
                     ISwapRouter.ExactInputSingleParams({
                         tokenIn: tokenIn,
-                        tokenOut: param.tokenOut,
+                        tokenOut: tokenOut,
                         fee: poolFee,
                         recipient: sender,
                         deadline: param.deadline,
