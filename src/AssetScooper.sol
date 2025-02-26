@@ -137,6 +137,7 @@ contract AssetScooper is
                         sqrtPriceLimitX96: 0
                     })
                 );
+            else continue;
         }
     }
 
@@ -258,16 +259,16 @@ contract AssetScooper is
         address tokenIn,
         address tokenOut,
         uint24 fee
-    ) private view returns (bool) {
+    ) private view returns (bool success) {
         address _pool = v3factory.getPool(tokenIn, tokenOut, fee);
         console.log("Found pool for", tokenIn, tokenOut, _pool);
+
         IUniswapV3Pool pool = IUniswapV3Pool(_pool);
         uint128 liquidity = pool.liquidity();
+
         if (liquidity > 0) {
             console.log("Pool > ", _pool, "has liquidity >", liquidity);
             return true;
-        } else {
-            revert PoolHasNoLiquidity(tokenIn, tokenOut, _pool);
         }
     }
 

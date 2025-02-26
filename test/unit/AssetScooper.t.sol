@@ -64,13 +64,13 @@ contract AssetScooperTest is Test, Constants, TestHelper {
     }
 
     function testSweepAssetWithSignature() public {
-        address[] memory assets = new address[](2);
-        uint256[] memory balances = new uint256[](2);
-        uint256[] memory outputs = new uint256[](2);
+        address[] memory assets = new address[](3);
+        uint256[] memory balances = new uint256[](3);
+        uint256[] memory outputs = new uint256[](3);
 
         assets[0] = address(aero);
-        assets[1] = address(dai);
-        // assets[2] = address(toby);
+        assets[1] = address(bento);
+        assets[2] = address(dai);
 
         uint256 len = assets.length;
 
@@ -109,7 +109,7 @@ contract AssetScooperTest is Test, Constants, TestHelper {
         IAssetScooper.SwapParam memory swapParam = createSwapParam(
             assets,
             outputs,
-            block.timestamp + 1 days
+            block.timestamp + 3600
         );
 
         ISignatureTransfer.TokenPermissions[]
@@ -122,7 +122,7 @@ contract AssetScooperTest is Test, Constants, TestHelper {
             memory permit2_ = defaultERC20PermitBatchTransfer(
                 batchTokenPermissions,
                 nonce,
-                block.timestamp + 1 days
+                block.timestamp + 3600
             );
 
         signature = getPermitTransferSignature(
