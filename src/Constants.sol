@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 abstract contract Constants {
     address public constant WETH = 0x4200000000000000000000000000000000000006;
-    address public constant router = 0x2626664c2603336E57B271c5C0b26F421741e481;
+    address public constant router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
     address public constant permit2Address = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
     address public constant factory = 0x33128a8fC17869897dcE68Ed026d694621f6FDfD;
 

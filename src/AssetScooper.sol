@@ -47,8 +47,12 @@ contract AssetScooper is IAssetScooper, Constants, Context, Ownable, Pausable, R
     ) public whenNotPaused nonReentrant {
         uint256 len = param.assets.length;
 
-        if (len != permit.permitted.length && len != param.minOutputAmounts.length && len <= 0) {
-            revert MismatchLength();
+        if (
+            len != permit.permitted.length ||
+            len != param.minOutputAmounts.length ||
+            len <= 0
+        ) {
+            revert MismatchLength(len);
         }
 
         address sender = _msgSender();
@@ -57,33 +61,50 @@ contract AssetScooper is IAssetScooper, Constants, Context, Ownable, Pausable, R
         (ISignatureTransfer.SignatureTransferDetails[] memory transferDetails, uint256[] memory userBal) =
             fillSignatureTransferDetailsArray(param, permit, sender);
 
-        ISwapRouter.ExactInputSingleParams[] memory swapParams = fillSwapParamArray(userBal, param, sender);
+        // ISwapRouter.ExactInputSingleParams[]
+        //     memory swapParams = fillSwapParamArray(userBal, param, sender);
 
         preemptiveApproval(param, userBal);
 
         _permit2.permitTransferFrom(permit, transferDetails, sender, signature);
 
         emit AssetTransferred(param, sender, address(this));
-        uint256 amountOut = swapTokens(param, swapParams);
+        uint256 amountOut = swapTokens(param, userBal);
         emit AssetSwapped(sender, param, amountOut);
     }
 
-    function swapTokens(IAssetScooper.SwapParam memory param, ISwapRouter.ExactInputSingleParams[] memory swapParams)
-        private
-        checkDeadline(param.deadline)
-        returns (uint256 amountOut)
-    {
+    function swapTokens(
+        IAssetScooper.SwapParam memory param,
+        uint256[] memory amountIn
+    ) private checkDeadline(param.deadline) returns (uint256 amountOut) {
         uint256 len = param.assets.length;
 
+        // amountOut = swapRouter.exactInputSingle(params);
+
         for (uint256 i; i < len; i++) {
-            try swapRouter.exactInputSingle(swapParams[i]) returns (uint256 amount) {
+            address tokenIn = normalizeAddress(param.assets[i]);
+            uint24 poolFee = getPoolFee(tokenIn, param.tokenOut);
+
+            ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+                .ExactInputSingleParams({
+                    tokenIn: tokenIn,
+                    tokenOut: param.tokenOut,
+                    fee: poolFee,
+                    recipient: msg.sender,
+                    deadline: block.timestamp,
+                    amountIn: amountIn[i],
+                    amountOutMinimum: param.minOutputAmounts[i],
+                    sqrtPriceLimitX96: 0
+                });
+
+            try swapRouter.exactInputSingle(params) returns (uint256 amount) {
                 if (amount < param.minOutputAmounts[i]) {
                     revert NotEnoughOutputAmount(amount);
                 }
 
                 amountOut += amount;
             } catch Error(string memory reason) {
-                console.log("Swap failed for tokenIn:", swapParams[i].tokenIn);
+                console.log("Swap failed for tokenIn:", params.tokenIn);
                 revert(string(abi.encodePacked("Swap failed: ", reason)));
             }
         }
@@ -112,7 +133,7 @@ contract AssetScooper is IAssetScooper, Constants, Context, Ownable, Pausable, R
                 deadline: param.deadline,
                 amountIn: amountIn[i],
                 amountOutMinimum: param.minOutputAmounts[i],
-                sqrtPriceLimitX96: 0
+                sqrtPriceLimitX96: 1
             });
         }
     }
@@ -156,13 +177,16 @@ contract AssetScooper is IAssetScooper, Constants, Context, Ownable, Pausable, R
     }
 
     function approveIfNeeded(address asset, uint256 userBal) private {
-        uint256 currentAllowance = IERC20(asset).allowance(address(this), address(swapRouter));
+        // uint256 currentAllowance = IERC20(asset).allowance(
+        //     address(this),
+        //     address(swapRouter)
+        // );
 
-        if (currentAllowance < userBal) {
-            uint256 approveAmount = userBal - currentAllowance;
+        IERC20(asset).approve(address(swapRouter), userBal);
 
-            IERC20(asset).safeIncreaseAllowance(address(swapRouter), approveAmount);
-        }
+        // if (currentAllowance < userBal) {
+        //     uint256 approveAmount = userBal - currentAllowance;
+        // }
     }
 
     function normalizeAddress(address addr) private pure returns (address) {
@@ -178,7 +202,29 @@ contract AssetScooper is IAssetScooper, Constants, Context, Ownable, Pausable, R
         return amount;
     }
 
-    function getPoolFee(address tokenIn, address tokenOut) private view returns (uint24) {
+    // function checkPool(
+    //     address tokenIn,
+    //     address tokenOut
+    // ) private view returns (bool) {
+    //     uint24[] memory feeTier = new uint24[](3);
+    //     feeTier[0] = 500;
+    //     feeTier[1] = 3000;
+    //     feeTier[2] = 10000;
+
+    //     uint256 len = feeTier.length;
+
+    //     for (uint256 i; i < len; i++) {
+    //         address pool = V3Factory.getPool(tokenIn, tokenOut, feeTier[i]);
+    //         if (pool != address(0)) {
+
+    //         }
+    //     }
+    // }
+
+    function getPoolFee(
+        address tokenIn,
+        address tokenOut
+    ) private view returns (uint24) {
         // uint24[3] memory feeTier;
         // feeTier[0] = 500;
         // feeTier[1] = 3000;

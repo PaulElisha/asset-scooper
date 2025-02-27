@@ -27,3 +27,4 @@ yarn-error.log
 
 # Hardhat
 hardhat.config.json
+lib/v3-periphery
