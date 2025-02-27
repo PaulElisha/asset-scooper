@@ -12,7 +12,7 @@ import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "./Interfaces/IExtendedSwapRouter.sol";
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
@@ -28,14 +28,11 @@ contract AssetScooper is
 
     address private immutable _owner;
     IWETH private immutable weth;
-    ISwapRouter public immutable swapRouter;
+    IExtendedSwapRouter public immutable swapRouter;
     IUniswapV3Factory public immutable v3factory;
     Permit2 public immutable permit2;
 
     string private constant _version = "2.0.0";
-
-    // 0xac9650d8
-    // bytes4 public constant SELECTOR = ; // bytes4(keccak256("multicall(bytes[])"));
 
     constructor(
         address _weth,
@@ -44,7 +41,7 @@ contract AssetScooper is
         address _permit2
     ) Ownable(_msgSender()) {
         weth = IWETH(_weth);
-        swapRouter = ISwapRouter(_router);
+        swapRouter = IExtendedSwapRouter(_router);
         v3factory = IUniswapV3Factory(factory);
         permit2 = Permit2(_permit2);
         _owner = _msgSender();
@@ -95,10 +92,17 @@ contract AssetScooper is
         bytes[] memory calls
     ) private returns (uint256 amountOut) {
         require(calls.length > 0, "No valid swaps to execute");
+        // 0x5ae401dc
+        bytes memory multicallData = abi.encodeWithSelector(
+            IExtendedSwapRouter.multicall.selector,
+            calls
+        );
 
-        bytes memory multicallData = abi.encodeWithSelector(0xac9650d8, calls);
+        (bool success, bytes memory result) = address(swapRouter).call(
+            multicallData
+        );
 
-        (bool success, bytes memory result) = router.call(multicallData);
+        // console.log(result);
         require(success, "Swap failed");
 
         if (result.length > 0) {
@@ -114,24 +118,21 @@ contract AssetScooper is
         uint256 len = param.assets.length;
         address[] memory assets = param.assets;
         calls = new bytes[](len);
-        address tokenOut = param.tokenOut == address(weth)
-            ? address(weth)
-            : USDC;
 
         for (uint256 i; i < len; i++) {
             address tokenIn = normalizeAddress(assets[i]);
-            uint24 poolFee = getPoolFee(tokenIn, tokenOut);
-            bool hasLiquidity = hasliquidity(tokenIn, tokenOut, poolFee);
+            uint24 poolFee = getPoolFee(tokenIn, param.tokenOut);
+            bool hasLiquidity = hasliquidity(tokenIn, param.tokenOut, poolFee);
 
             if (hasLiquidity)
                 calls[i] = abi.encodeWithSelector(
                     ISwapRouter.exactInputSingle.selector,
                     ISwapRouter.ExactInputSingleParams({
                         tokenIn: tokenIn,
-                        tokenOut: tokenOut,
+                        tokenOut: param.tokenOut,
                         fee: poolFee,
                         recipient: sender,
-                        deadline: block.timestamp,
+                        deadline: param.deadline,
                         amountIn: amountIn[i],
                         amountOutMinimum: param.minOutputAmounts[i],
                         sqrtPriceLimitX96: 0
@@ -164,12 +165,9 @@ contract AssetScooper is
 
         for (uint256 i; i < len; i++) {
             address asset = normalizeAddress(assets[i]);
-            uint8 decimals = IERC20Metadata(asset).decimals();
-            uint256 balance = normalizeTokenAmount(
-                IERC20(asset).balanceOf(sender),
-                decimals
-            );
-
+            // uint8 decimals = IERC20Metadata(asset).decimals();
+            uint256 balance = IERC20(asset).balanceOf(sender);
+            // uint256 amount = normalizeTokenAmount(balance, decimals);
             if (balance > 0 && asset == _permit.permitted[i].token) {
                 transferDetails[i] = ISignatureTransfer
                     .SignatureTransferDetails({
@@ -236,9 +234,9 @@ contract AssetScooper is
     ) private view returns (uint24) {
         uint24[] memory feeTier = new uint24[](4);
         feeTier[0] = 100;
-        feeTier[1] = 500;
-        feeTier[2] = 3000;
-        feeTier[3] = 10000;
+        feeTier[0] = 500;
+        feeTier[1] = 3000;
+        feeTier[2] = 10000;
 
         uint256 index = 0;
         uint256 len = feeTier.length;

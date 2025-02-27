@@ -17,11 +17,10 @@ contract AssetScooperTest is Test, Constants, TestHelper {
     DeployAssetScooper deployAssetScooper;
     AssetScooper assetScooper;
     Permit2 permit2;
-    IERC20 aero;
-    IERC20 wgc;
-    IERC20 toby;
-    IERC20 bento;
     IERC20 dai;
+    IERC20 usdc;
+    IERC20 aixbt;
+    IERC20 weth;
 
     address userA;
     address userB;
@@ -31,8 +30,6 @@ contract AssetScooperTest is Test, Constants, TestHelper {
     bytes signature;
 
     uint256 internal mainnetFork;
-    address public constant SWAP_ROUTER =
-        0x2626664c2603336E57B271c5C0b26F421741e481;
 
     function setUp() public {
         deployAssetScooper = new DeployAssetScooper();
@@ -45,11 +42,10 @@ contract AssetScooperTest is Test, Constants, TestHelper {
 
         console2.log(userA);
 
-        aero = IERC20(AERO);
-        wgc = IERC20(WGC);
-        toby = IERC20(TOBY);
-        bento = IERC20(BENTO);
         dai = IERC20(DAI);
+        usdc = IERC20(USDC);
+        weth = IERC20(WETH);
+        aixbt = IERC20(AIXBT);
 
         mainnetFork = vm.createFork(fork_url);
         vm.selectFork(mainnetFork);
@@ -64,40 +60,23 @@ contract AssetScooperTest is Test, Constants, TestHelper {
     }
 
     function testSweepAssetWithSignature() public {
-        address[] memory assets = new address[](3);
-        uint256[] memory balances = new uint256[](3);
-        uint256[] memory outputs = new uint256[](3);
+        address[] memory assets = new address[](1);
+        uint256[] memory balances = new uint256[](1);
+        uint256[] memory outputs = new uint256[](1);
 
-        assets[0] = address(aero);
-        assets[1] = address(bento);
-        assets[2] = address(dai);
+        assets[0] = address(usdc);
+        outputs[0] = 1e18;
 
         uint256 len = assets.length;
 
         uint256 nonce = 20;
         domain_separator = permit2.DOMAIN_SEPARATOR();
 
-        // Mock the Uniswap Router
-        MockSwapRouter mockRouter = new MockSwapRouter();
-        vm.etch(SWAP_ROUTER, address(mockRouter).code);
-
-        // Deal tokens to userA
-        for (uint256 i; i < len; i++) {
-            deal(address(assets[i]), userA, 100e18);
-        }
-
-        // Deal USDC to mock router and approve it
-        deal(USDC, address(mockRouter), 1000e24);
-        deal(USDC, SWAP_ROUTER, 1000e24);
-
-        vm.startPrank(address(mockRouter));
-        IERC20(USDC).approve(address(mockRouter), type(uint256).max);
-        vm.stopPrank();
-
         // Get initial balances
         for (uint256 i; i < len; i++) {
             balances[i] = IERC20(assets[i]).balanceOf(userA);
-            outputs[i] = 1e18;
+            console.log("Balance Before Swap:", balances[i]);
+            console.log(" Output Token Before Swap:", aixbt.balanceOf(userA));
         }
 
         vm.startPrank(userA);
@@ -138,68 +117,42 @@ contract AssetScooperTest is Test, Constants, TestHelper {
 
         // Assert final balances
         for (uint256 i; i < len; i++) {
-            assertLt(IERC20(assets[i]).balanceOf(userA), balances[i]);
+            console.log(
+                "Balance After Swap:",
+                IERC20(assets[i]).balanceOf(userA)
+            );
+            console.log(" Output Token After Swap:", aixbt.balanceOf(userA));
+            assertEq(IERC20(assets[i]).balanceOf(userA), 0);
         }
 
-        IERC20 outputToken = IERC20(USDC);
-        assertGt(outputToken.balanceOf(userA), 0);
-        console.log("User output token balance:", outputToken.balanceOf(userA));
+        assertGt(aixbt.balanceOf(userA), 0);
+        console.log("Output Token After Swap:", aixbt.balanceOf(userA));
     }
 
     function testInvalidSignature_SweepAsset() public {
+        address[] memory assets = new address[](1);
+        uint256[] memory balances = new uint256[](1);
+        uint256[] memory outputs = new uint256[](1);
+
+        assets[0] = address(aixbt);
+        outputs[0] = 1e18;
+
+        uint256 len = assets.length;
+
         uint256 nonce = 20;
         domain_separator = permit2.DOMAIN_SEPARATOR();
 
-        // Mock the Uniswap Router
-        MockSwapRouter mockRouter = new MockSwapRouter();
-        vm.etch(SWAP_ROUTER, address(mockRouter).code);
-
-        // Deal tokens to userA
-        deal(address(aero), userA, 100e18);
-        deal(address(dai), userA, 100e18);
-        deal(address(bento), userA, 100e18);
-        deal(address(toby), userA, 100e18);
-
-        // Deal USDC to mock router and approve it
-        deal(USDC, address(mockRouter), 1000e6);
-        deal(USDC, SWAP_ROUTER, 1000e6);
-
-        vm.startPrank(address(mockRouter));
-        IERC20(USDC).approve(address(mockRouter), type(uint256).max);
-        vm.stopPrank();
-
         // Get initial balances
-        uint256 initialAeroBalance = aero.balanceOf(userA);
-        uint256 initialDaiBalance = dai.balanceOf(userA);
-        uint256 initialBentoBalance = bento.balanceOf(userA);
-        uint256 initialTobyBalance = toby.balanceOf(userA);
+        for (uint256 i; i < len; i++) {
+            balances[i] = IERC20(assets[i]).balanceOf(userA);
+            console.log("Balance Before Swap:", balances[i]);
+        }
 
         vm.startPrank(userA);
-        aero.approve(address(permit2), type(uint256).max);
-        dai.approve(address(permit2), type(uint256).max);
-        bento.approve(address(permit2), type(uint256).max);
-        toby.approve(address(permit2), type(uint256).max);
+        for (uint256 i; i < len; i++) {
+            IERC20(assets[i]).approve(address(permit2), type(uint256).max);
+        }
         vm.stopPrank();
-
-        address[] memory assets = new address[](4);
-        uint256[] memory outputs = new uint256[](4);
-        uint256[] memory balances = new uint256[](4);
-
-        assets[0] = address(aero);
-        assets[1] = address(dai);
-        assets[2] = address(bento);
-        assets[3] = address(toby);
-
-        balances[0] = initialAeroBalance;
-        balances[1] = initialDaiBalance;
-        balances[2] = initialBentoBalance;
-        balances[3] = initialTobyBalance;
-
-        // Set very small minimum outputs for USDC (6 decimals)
-        outputs[0] = 1e4; // 0.01 USDC
-        outputs[1] = 1e4;
-        outputs[2] = 1e4;
-        outputs[3] = 1e4;
 
         IAssetScooper.SwapParam memory swapParam = createSwapParam(
             assets,
@@ -227,9 +180,17 @@ contract AssetScooperTest is Test, Constants, TestHelper {
             domain_separator
         );
 
-        vm.expectRevert();
         vm.startPrank(userA);
+        vm.expectRevert();
         assetScooper.sweepAsset(swapParam, permit2_, signature);
         vm.stopPrank();
+
+        // Assert final balances
+        for (uint256 i; i < len; i++) {
+            assertLt(IERC20(assets[i]).balanceOf(userA), balances[i]);
+        }
+
+        console.log("Output Token:", usdc.balanceOf(userA));
+        console.log("User output token balance:", usdc.balanceOf(userA));
     }
 }

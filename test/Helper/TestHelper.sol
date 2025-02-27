@@ -48,7 +48,7 @@ contract TestHelper is Constants {
             swapParam = IAssetScooper.SwapParam({
                 assets: assets,
                 minOutputAmounts: outputAmounts,
-                tokenOut: USDC,
+                tokenOut: 0x50dA645f148798F68EF2d7dB7C1CB22A6819bb2C,
                 deadline: deadline
             });
         }
