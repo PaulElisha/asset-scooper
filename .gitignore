@@ -12,4 +12,18 @@ docs/
 
 # Dotenv file
 .env
-lib*
+lib/
+lib/**
+lib/**/**
+
+# Node modules
+node_modules/
+
+# Solidity coverage
+coverage/
+
+# Yarn  
+yarn-error.log
+
+# Hardhat
+hardhat.config.json
