@@ -12,3 +12,19 @@ docs/
 
 # Dotenv file
 .env
+
+# Ignore the broadcast directory
+broadcast/
+
+# Ignore the .gas-snapshot file
+.gas-snapshot
+
+# Ignore the package-lock.json file
+lib/
+
+# Ignore the package-lock.json file
+.qodo
+
+# Ignore the paul and paul.pub files
+paul
+paul.pub
