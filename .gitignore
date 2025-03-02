@@ -19,8 +19,6 @@ broadcast/
 # Ignore the .gas-snapshot file
 .gas-snapshot
 
-# Ignore the package-lock.json file
-lib/
 
 # Ignore the package-lock.json file
 .qodo
@@ -28,3 +26,10 @@ lib/
 # Ignore the paul and paul.pub files
 paul
 paul.pub
+
+# Ignore build artifacts (if applicable)
+out/
+cache/
+
+# Ignore the lib directory
+lib/

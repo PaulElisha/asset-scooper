@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
-import "../src/Constants.sol";
+import "../src/interfaces/constants/Constants.sol";
 import "../src/AssetScooper.sol";
 import "permit2/src/Permit2.sol";
 
@@ -16,7 +16,12 @@ contract DeployAssetScooper is Script, Constants {
 
     function deployAssetScooper() public returns (AssetScooper) {
         vm.startBroadcast();
-        assetScooper = new AssetScooper(WETH, router, factory, permit2Address);
+        assetScooper = new AssetScooper(
+            ROUTER,
+            V3_FACTORY,
+            PERMIT2,
+            PROTOCOL_FEE_RECIPIENT
+        );
         vm.stopBroadcast();
 
         return (assetScooper);

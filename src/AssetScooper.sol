@@ -3,18 +3,20 @@ pragma solidity ^0.8.0;
 
 import "forge-std/console.sol";
 import "permit2/src/Permit2.sol";
-import "./Interfaces/IAssetScooper.sol";
-import "./interfaces/IWETH.sol";
-import "./Constants.sol";
+import "./interfaces/IAssetScooper.sol";
+import "./interfaces/constants/Constants.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "./Interfaces/IExtendedSwapRouter.sol";
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import "@swap-router/contracts/interfaces/ISwapRouter02.sol";
+import "@swap-router/contracts/interfaces/IV3SwapRouter.sol";
+import "@uniswap/v3-core/contracts/libraries/TransferHelper.sol";
 
 contract AssetScooper is
     IAssetScooper,
@@ -26,25 +28,25 @@ contract AssetScooper is
 {
     using SafeERC20 for IERC20;
 
-    address private immutable _owner;
-    IWETH private immutable weth;
-    IExtendedSwapRouter public immutable swapRouter;
+    address public immutable _owner;
+    address public immutable protocolFeeRecipient;
+    ISwapRouter02 public swapRouter;
     IUniswapV3Factory public immutable v3factory;
     Permit2 public immutable permit2;
 
-    string private constant _version = "2.0.0";
+    string public constant _version = "2.0.0";
 
     constructor(
-        address _weth,
         address _router,
         address factory,
-        address _permit2
+        address _permit2,
+        address _protocolFeeRecipient
     ) Ownable(_msgSender()) {
-        weth = IWETH(_weth);
-        swapRouter = IExtendedSwapRouter(_router);
+        swapRouter = ISwapRouter02(_router);
         v3factory = IUniswapV3Factory(factory);
         permit2 = Permit2(_permit2);
         _owner = _msgSender();
+        protocolFeeRecipient = _protocolFeeRecipient;
     }
 
     modifier checkDeadline(uint256 deadline) {
@@ -55,90 +57,90 @@ contract AssetScooper is
     function sweepAsset(
         IAssetScooper.SwapParam memory param,
         ISignatureTransfer.PermitBatchTransferFrom memory permit,
-        bytes memory signature
-    ) public checkDeadline(param.deadline) whenNotPaused nonReentrant {
+        bytes memory signature,
+        address to
+    ) external checkDeadline(param.deadline) whenNotPaused nonReentrant {
         uint256 len = param.assets.length;
 
         if (
-            len != permit.permitted.length &&
-            len != param.minOutputAmounts.length &&
+            len != permit.permitted.length ||
+            len != param.minOutputAmounts.length ||
             len <= 0
-        ) {
-            revert MismatchLength(len);
-        }
-
-        address sender = _msgSender();
-        Permit2 _permit2 = permit2;
+        ) revert MismatchLength(len);
 
         (
-            ISignatureTransfer.SignatureTransferDetails[]
-                memory transferDetails,
-            uint256[] memory userBal
-        ) = fillSignatureTransferDetailsArray(param, permit, sender);
+            uint256[] memory userBal,
+            ISignatureTransfer.SignatureTransferDetails[] memory transferDetails
+        ) = fillSignatureTransferDetailsArray(param, permit, _msgSender());
 
-        bytes[] memory callData = fillSwapCallData(userBal, param, sender);
+        bytes[] memory callData = fillSwapCallData(userBal, param);
 
         if (!preemptiveApproval(param, userBal))
             revert CannotApproveBalanceZeroOrLess();
 
-        _permit2.permitTransferFrom(permit, transferDetails, sender, signature);
+        permit2.permitTransferFrom(
+            permit,
+            transferDetails,
+            _msgSender(),
+            signature
+        );
 
-        emit AssetTransferred(param, sender, address(this));
-        uint256 amountOut = batchSwap(callData);
-        emit SwapExecuted(sender, param, amountOut);
+        emit AssetTransferred(param, _msgSender(), address(this));
+        batchSwap(param.deadline, callData);
+
+        uint256 outputTokenBalance = IERC20(param.tokenOut).balanceOf(
+            address(this)
+        );
+
+        (uint256 protocolFee, uint256 amountOutMinusFee) = calculateProtocolFee(
+            outputTokenBalance
+        );
+
+        if (protocolFee > 0) {
+            IERC20(param.tokenOut).safeTransfer(
+                protocolFeeRecipient,
+                protocolFee
+            );
+        }
+
+        IERC20(param.tokenOut).safeTransfer(to, amountOutMinusFee);
+
+        emit SwapExecuted(_msgSender(), param);
     }
 
-    function batchSwap(
-        bytes[] memory calls
-    ) private returns (uint256 amountOut) {
+    function batchSwap(uint256 deadline, bytes[] memory calls) private {
         require(calls.length > 0, "No valid swaps to execute");
-        // 0x5ae401dc
-        bytes memory multicallData = abi.encodeWithSelector(
-            IExtendedSwapRouter.multicall.selector,
-            calls
-        );
 
-        (bool success, bytes memory result) = address(swapRouter).call(
-            multicallData
+        (bool success, ) = address(swapRouter).call(
+            abi.encodeWithSelector(0x5ae401dc, deadline, calls)
         );
-
-        // console.log(result);
         require(success, "Swap failed");
-
-        if (result.length > 0) {
-            amountOut = abi.decode(result, (uint256));
-        }
     }
 
     function fillSwapCallData(
         uint256[] memory amountIn,
-        IAssetScooper.SwapParam memory param,
-        address sender
+        IAssetScooper.SwapParam memory param
     ) private view returns (bytes[] memory calls) {
-        uint256 len = param.assets.length;
         address[] memory assets = param.assets;
-        calls = new bytes[](len);
+        calls = new bytes[](assets.length);
+        require(param.tokenOut == USDC);
 
-        for (uint256 i; i < len; i++) {
-            address tokenIn = normalizeAddress(assets[i]);
+        for (uint256 i; i < assets.length; i++) {
+            address tokenIn = assets[i];
             uint24 poolFee = getPoolFee(tokenIn, param.tokenOut);
-            bool hasLiquidity = hasliquidity(tokenIn, param.tokenOut, poolFee);
 
-            if (hasLiquidity)
-                calls[i] = abi.encodeWithSelector(
-                    ISwapRouter.exactInputSingle.selector,
-                    ISwapRouter.ExactInputSingleParams({
-                        tokenIn: tokenIn,
-                        tokenOut: param.tokenOut,
-                        fee: poolFee,
-                        recipient: sender,
-                        deadline: param.deadline,
-                        amountIn: amountIn[i],
-                        amountOutMinimum: param.minOutputAmounts[i],
-                        sqrtPriceLimitX96: 0
-                    })
-                );
-            else continue;
+            calls[i] = abi.encodeWithSelector(
+                swapRouter.exactInputSingle.selector,
+                IV3SwapRouter.ExactInputSingleParams({
+                    tokenIn: tokenIn,
+                    tokenOut: param.tokenOut,
+                    fee: poolFee,
+                    recipient: address(this),
+                    amountIn: amountIn[i],
+                    amountOutMinimum: param.minOutputAmounts[i],
+                    sqrtPriceLimitX96: 0
+                })
+            );
         }
     }
 
@@ -150,24 +152,23 @@ contract AssetScooper is
         private
         view
         returns (
-            ISignatureTransfer.SignatureTransferDetails[]
-                memory transferDetails,
-            uint256[] memory userBalance
+            uint256[] memory userBalance,
+            ISignatureTransfer.SignatureTransferDetails[] memory transferDetails
         )
     {
-        uint256 len = param.assets.length;
         address[] memory assets = param.assets;
 
         transferDetails = new ISignatureTransfer.SignatureTransferDetails[](
-            len
+            assets.length
         );
-        userBalance = new uint256[](len);
+        userBalance = new uint256[](assets.length);
 
-        for (uint256 i; i < len; i++) {
-            address asset = normalizeAddress(assets[i]);
-            // uint8 decimals = IERC20Metadata(asset).decimals();
-            uint256 balance = IERC20(asset).balanceOf(sender);
-            // uint256 amount = normalizeTokenAmount(balance, decimals);
+        for (uint256 i; i < assets.length; i++) {
+            address asset = assets[i];
+            uint256 balance = normalizeTokenAmount(
+                IERC20(asset).balanceOf(sender),
+                IERC20Metadata(asset).decimals()
+            );
             if (balance > 0 && asset == _permit.permitted[i].token) {
                 transferDetails[i] = ISignatureTransfer
                     .SignatureTransferDetails({
@@ -203,29 +204,22 @@ contract AssetScooper is
         );
 
         if (currentAllowance < userBal) {
-            uint256 approveAmount = userBal - currentAllowance;
-
             IERC20(asset).safeIncreaseAllowance(
                 address(swapRouter),
-                approveAmount
+                userBal - currentAllowance
             );
-            return true;
+            success = true;
         }
-        console.log("Approval Failed!", asset);
-        return false;
-    }
-
-    function normalizeAddress(address addr) private pure returns (address) {
-        return address(uint160(addr));
     }
 
     function normalizeTokenAmount(
         uint256 amount,
         uint8 decimal
     ) private pure returns (uint256) {
-        if (decimal < STANDARD_DECIMAL) {
-            return amount * (10 ** (STANDARD_DECIMAL - decimal));
-        } else return amount;
+        return
+            decimal < STANDARD_DECIMAL
+                ? amount * (10 ** (STANDARD_DECIMAL - decimal))
+                : amount;
     }
 
     function getPoolFee(
@@ -234,16 +228,17 @@ contract AssetScooper is
     ) private view returns (uint24) {
         uint24[] memory feeTier = new uint24[](4);
         feeTier[0] = 100;
-        feeTier[0] = 500;
-        feeTier[1] = 3000;
-        feeTier[2] = 10000;
+        feeTier[1] = 500;
+        feeTier[2] = 3000;
+        feeTier[3] = 10000;
 
         uint256 index = 0;
         uint256 len = feeTier.length;
         while (index < len) {
             address pool = v3factory.getPool(tokenIn, tokenOut, feeTier[index]);
 
-            if (pool != address(0)) {
+            if (pool != address(0) && hasliquidity(pool)) {
+                console.log("Found pool for:", tokenIn, tokenOut, pool);
                 console.log("Found fee for", tokenIn, tokenOut, feeTier[index]);
                 return feeTier[index];
             }
@@ -253,21 +248,37 @@ contract AssetScooper is
         revert PoolFeeNotFound(tokenIn, tokenOut);
     }
 
-    function hasliquidity(
-        address tokenIn,
-        address tokenOut,
-        uint24 fee
-    ) private view returns (bool success) {
-        address _pool = v3factory.getPool(tokenIn, tokenOut, fee);
-        console.log("Found pool for", tokenIn, tokenOut, _pool);
-
+    function hasliquidity(address _pool) private view returns (bool success) {
         IUniswapV3Pool pool = IUniswapV3Pool(_pool);
         uint128 liquidity = pool.liquidity();
+        console.log("Liquidity:", liquidity);
 
         if (liquidity > 0) {
-            console.log("Pool > ", _pool, "has liquidity >", liquidity);
             return true;
         }
+        console.log("Pool has no liquidity");
+        return false;
+    }
+
+    function calculateProtocolFee(
+        uint256 outputTokenBalance
+    ) private pure returns (uint256, uint256) {
+        uint256 protocolFee = Math.mulDiv(
+            outputTokenBalance,
+            PROTOCOL_FEE_BPS,
+            10_000
+        );
+
+        uint256 amountOutMinusFee = outputTokenBalance - protocolFee;
+
+        return (protocolFee, amountOutMinusFee);
+    }
+
+    function calculateAmountOutMinusFee(
+        uint256 totalOutput,
+        uint256 protocolFee
+    ) private pure returns (uint256) {
+        return totalOutput - protocolFee;
     }
 
     function owner()

@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../../src/Interfaces/IAssetScooper.sol";
 import "../../src/AssetScooper.sol";
 import "permit2/src/interfaces/ISignatureTransfer.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Vm} from "forge-std/Vm.sol";
-import "../../src/Constants.sol";
+import "../../src/interfaces/constants/Constants.sol";
 
 contract TestHelper is Constants {
     Vm private constant vm =
@@ -48,7 +47,7 @@ contract TestHelper is Constants {
             swapParam = IAssetScooper.SwapParam({
                 assets: assets,
                 minOutputAmounts: outputAmounts,
-                tokenOut: 0x50dA645f148798F68EF2d7dB7C1CB22A6819bb2C,
+                tokenOut: USDC,
                 deadline: deadline
             });
         }

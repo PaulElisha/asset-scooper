@@ -4,23 +4,17 @@ pragma solidity ^0.8.0;
 import "permit2/src/interfaces/ISignatureTransfer.sol";
 
 interface IAssetScooper {
-    error NotEnoughOutputAmount(uint256 amountOut);
     error MismatchLength(uint256);
     error CannotApproveBalanceZeroOrLess();
-    error PoolHasNoLiquidity(address pool, address tokenIn, address tokenOut);
     error PoolFeeNotFound(address tokenIn, address tokenOut);
+    error ApprovalFailed(address);
 
     event AssetTransferred(
         SwapParam indexed param,
         address indexed receiver,
         address indexed sender
     );
-    event SwapExecuted(
-        address indexed sender,
-        SwapParam indexed param,
-        uint256 indexed amountOut
-    );
-    event InsufficientLiquidity(address indexed token0, address indexed token1);
+    event SwapExecuted(address indexed sender, SwapParam indexed param);
 
     struct SwapParam {
         address[] assets;
@@ -36,6 +30,7 @@ interface IAssetScooper {
     function sweepAsset(
         SwapParam memory param,
         ISignatureTransfer.PermitBatchTransferFrom memory permit,
-        bytes memory signature
+        bytes memory signature,
+        address to
     ) external;
 }
