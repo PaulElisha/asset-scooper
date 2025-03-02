@@ -30,6 +30,3 @@ paul.pub
 # Ignore build artifacts (if applicable)
 out/
 cache/
-
-# Ignore the lib directory
-lib/
