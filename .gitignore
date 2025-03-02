@@ -1,0 +1,32 @@
+# Compiler files
+cache/
+out/
+
+# Ignores development broadcast logs
+!/broadcast
+/broadcast/*/31337/
+/broadcast/**/dry-run/
+
+# Docs
+docs/
+
+# Dotenv file
+.env
+
+# Ignore the broadcast directory
+broadcast/
+
+# Ignore the .gas-snapshot file
+.gas-snapshot
+
+
+# Ignore the package-lock.json file
+.qodo
+
+# Ignore the paul and paul.pub files
+paul
+paul.pub
+
+# Ignore build artifacts (if applicable)
+out/
+cache/
